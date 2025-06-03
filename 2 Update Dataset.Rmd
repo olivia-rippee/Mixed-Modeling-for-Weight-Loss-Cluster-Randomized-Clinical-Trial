@@ -1,0 +1,132 @@
+---
+title: "Appendix: R Code"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning=FALSE, message=FALSE)
+library(tidyverse)
+library(knitr)
+```
+
+
+```{r data}
+
+data <- read.csv("path/Study Data/REPOWERFinalDataStacked2020_10_02.csv", na.strings=".")
+
+data <- filter(data, time %in% c(0, 6, 24))
+
+```
+
+
+```{r delta IWQOL}
+
+# Initial data subsets by timepoint
+data_0mo <- filter(data, time==0)
+data_6mo <- filter(data, time==6)
+data_24mo <- filter(data, time==24)
+
+# Subset IWQOL by timepoint
+iwqol_0mo <- data_0mo$iwqoltotal
+iwqol_6mo <- data_6mo$iwqoltotal
+iwqol_24mo <- data_24mo$iwqoltotal
+
+
+# Calculate change in IWQOL for each patient at each timepoint
+iwqol_delta_0to6 <- iwqol_6mo - iwqol_0mo
+iwqol_delta_0to24 <- iwqol_24mo - iwqol_0mo
+
+
+# Add change from 0 to 6 months to base data set (3 timepoint = 3 reps)
+data <- data %>% 
+  mutate(iwqol_delta_0to6 = rep(iwqol_delta_0to6, each=3))
+
+
+# Add change from 0 to 24 months to base data set (3 timepoint = 3 reps)
+data <- data %>% 
+  mutate(iwqol_delta_0to24 = rep(iwqol_delta_0to24, each=3))
+
+#head(data[, c("study_id", "time", "iwqoltotal", "iwqol_delta_0to6", "iwqol_delta_0to24")])
+
+```
+
+
+```{r comorbidities}
+
+# Add comorbidity count and proxy for 2+ comorbidities to dataset
+comorbidities <- c("bmh_high_cholest", "bmh_asthma", "bmh_respiratory", 
+                   "bmh_colitiscrohns", "bmh_hip", "bmh_knee", "bmh_gallblad", 
+                   "bmh_heartfail", "bmh_angin", "bmh_stroke", "bmh_claud", 
+                   "bmh_arthritis", "bmh_hyperthy", "bmh_hypothy", "bmh_hypertens", 
+                   "bmh_pain_wlkmin20", "bmh_diabetes", "bmh_cancer")
+
+data <- data %>%
+  mutate(comorbidities_num = rowSums(across(comorbidities))) %>%                
+  mutate(two_plus_comorbidities = ifelse(comorbidities_num >= 2, 1, 0))
+
+
+# Add mental health disorder count and proxy for 1+ mental health disorders to dataset
+mental_health_vars <- c("bmh_depression", "bmh_anxiety", "bmh_othermental")
+
+data <- data %>%
+  mutate(mental_health_num = rowSums(across(mental_health_vars))) %>%                
+  mutate(mental_health = ifelse(mental_health_num >= 1, 1, 0))
+
+
+#head(data[, c("study_id", "time", "comorbidities_num", "two_plus_comorbidities", 
+#              "mental_health_num", "mental_health")])
+
+
+```
+
+
+```{r delta BMI}
+
+# Calculate BMIs for all timepoints
+data$bmi_all <- round((data$weight_kg*2.20462/data$height^2)*703, digits=1)
+
+#head(data[,c("time", "weight_kg", "height", "bmi", "bmi_all")])
+
+
+# Update subsets
+data_0mo <- filter(data, time==0)
+data_6mo <- filter(data, time==6)
+data_24mo <- filter(data, time==24)
+
+# Calculate delta BMI (relative to 0 mo)
+bmi_0mo <- data_0mo$bmi_all
+bmi_6mo <- data_6mo$bmi_all
+bmi_24mo <- data_24mo$bmi_all
+
+
+# Calculate change in IWQOL for each patient at each timepoint
+bmi_delta_0to0 <- bmi_0mo - bmi_0mo
+bmi_delta_0to6 <- bmi_6mo - bmi_0mo
+bmi_delta_0to24 <- bmi_24mo - bmi_0mo
+
+# Add change to base data set
+data_0mo <- data_0mo %>% 
+  mutate(bmi_delta = bmi_delta_0to0)
+
+data_6mo <- data_6mo %>% 
+  mutate(bmi_delta = bmi_delta_0to6)
+
+data_24mo <- data_24mo %>% 
+  mutate(bmi_delta = bmi_delta_0to24)
+
+data <- rbind(data_0mo, data_6mo, data_24mo)
+data <- data[order(data$study_id, data$time),]
+
+```
+
+
+
+```{r data export}
+write.csv(data, "path/Study Data/data_OR.csv", 
+          row.names=FALSE)
+```
+
+
+
+```{r ref.label=knitr::all_labels(), echo=TRUE, eval=FALSE}
+```

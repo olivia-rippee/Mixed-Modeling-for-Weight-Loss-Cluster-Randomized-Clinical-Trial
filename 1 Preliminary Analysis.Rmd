@@ -1,0 +1,1003 @@
+---
+title: "IWQOL Preliminary Analysis"
+author: "Olivia Rippee"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning=FALSE, 
+                      fig.align = "center", 
+                      options(digits=3))
+library(readxl)
+library(ggplot2)
+library(GGally)
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(vtable)
+library(smplot2)
+library(grid)
+library(gridExtra)
+theme_update(axis.title = element_text(size = 8),
+             axis.text = element_text(size = 8),
+             title = element_text(size = 8))
+```
+
+
+```{r data}
+data <- read.csv("path/Study Data/REPOWERFinalDataStacked2020_10_02.csv", na.strings=".")
+
+data <- filter(data, time %in% c(0, 6, 24))
+
+data_0mo <- filter(data, time==0)
+data_6mo <- filter(data, time==6)
+data_24mo <- filter(data, time==24)
+
+arm1 <- filter(data, treatment_arm=="In-clinic individual")
+arm2 <- filter(data, treatment_arm=="Phone group")
+arm3 <- filter(data, treatment_arm=="In-clinic group")
+```
+
+# Initial BMI
+
+```{r desc stats initial BMI}
+
+data_0mo_BMI_summary <- t(summary(data_0mo$bmi))
+kable(data_0mo_BMI_summary, caption = "Summary Table of BMI at 0 Months - Overall") %>% 
+  kable_styling(latex_options = "striped")
+
+data_0mo_remove_NA_BMI <- data_0mo %>% drop_na(bmi)
+
+arm1_0mo <- filter(data_0mo_remove_NA_BMI, treatment_arm=="In-clinic individual")
+arm2_0mo <- filter(data_0mo_remove_NA_BMI, treatment_arm=="Phone group")
+arm3_0mo <- filter(data_0mo_remove_NA_BMI, treatment_arm=="In-clinic group")
+
+arm1_summary <- t(summary(arm1_0mo$bmi))
+arm2_summary <- t(summary(arm2_0mo$bmi))
+arm3_summary <- t(summary(arm3_0mo$bmi))
+
+initial_BMI_summary <- rbind(arm1_summary, arm2_summary, arm3_summary)
+rownames(initial_BMI_summary) = c("In-Clinic Individual", "Phone Group", "In-Clinic Group")
+
+kable(initial_BMI_summary, caption = "Summary Table of BMI at 0 Months - By Treatment Arm") %>% 
+  kable_styling(latex_options = "striped")
+
+```
+
+
+```{r r desc stats initial BMI graphs, fig.height= 3, fig.width=6}
+
+p1 <- ggplot(data_0mo_remove_NA_BMI, aes(x=factor(1), y=bmi)) +
+  geom_boxplot() +
+  labs(x="Overall", y="BMI") +
+  geom_hline(yintercept=18.5, color = "blue") +
+  geom_hline(yintercept=25, color = "green") +
+  geom_hline(yintercept=30, color = "red")
+
+p2 <- ggplot(data_0mo_remove_NA_BMI, aes(x=treatment_arm, y=bmi)) + 
+  geom_boxplot() +
+  labs(x="Treatment Arm", y="BMI") +
+  geom_hline(yintercept=18.5, color = "blue") +
+  geom_hline(yintercept=25, color = "green") +
+  geom_hline(yintercept=30, color = "red")
+
+grid.arrange(p1, p2, ncol=2, widths=c(4, 8), top=textGrob("Initial BMI"))
+
+```
+
+\pagebreak
+
+# Percent Weight Change
+
+```{r desc stats weight table}
+
+data_24mo_weight_summary <- t(summary(data_24mo$weight_chng_per))
+kable(data_24mo_weight_summary, caption = "Summary Table of Percent Weight Change at 24 Months") %>% 
+  kable_styling(latex_options = "striped")
+
+data_24mo_remove_NA_weight <- data_24mo %>% drop_na(weight_chng_per)
+
+arm1_24mo <- filter(data_24mo_remove_NA_weight, treatment_arm=="In-clinic individual")
+arm2_24mo <- filter(data_24mo_remove_NA_weight, treatment_arm=="Phone group")
+arm3_24mo <- filter(data_24mo_remove_NA_weight, treatment_arm=="In-clinic group")
+
+arm1_summary <- t(summary(arm1_24mo$weight_chng_per))
+arm2_summary <- t(summary(arm2_24mo$weight_chng_per))
+arm3_summary <- t(summary(arm3_24mo$weight_chng_per))
+
+weight_chng_summary <- rbind(arm1_summary, arm2_summary, arm3_summary)
+rownames(weight_chng_summary) = c("In-Clinic Individual", "Phone Group", "In-Clinic Group")
+
+kable(weight_chng_summary, caption = "Summary Table of Percent Weight Change at 24 Months") %>% 
+  kable_styling(latex_options = "striped")
+
+```
+
+
+```{r desc stats weight graphs, fig.height= 3, fig.width=6}
+
+p1 <- ggplot(data_24mo_remove_NA_weight, aes(x=factor(1), y=weight_chng_per)) + 
+  geom_boxplot() +
+  labs(x="Overall", y="Weight Change (%)") +
+  geom_hline(yintercept=0, color = "blue")
+
+p2 <- ggplot(data_24mo_remove_NA_weight, aes(x=treatment_arm, y=weight_chng_per)) + 
+  geom_boxplot() +
+  labs(x="Treatment Arm", y="Weight Change (%)") +
+  geom_hline(yintercept=0, color = "blue")
+
+grid.arrange(p1, p2, ncol=2, widths=c(4, 8), top=textGrob("Percent Weight Change"))
+
+```
+
+\pagebreak
+
+# Attendance
+
+## Beginning of Study (0-6 Months)
+
+```{r desc stats attendance 0-6 mo}
+
+# Overall
+prop_attend_beginning <- t(summary(data_24mo$prop_att_00_06))
+kable(prop_attend_beginning, caption = "Summary Table of Attendance Proportion for Months 0-6") %>% 
+  kable_styling(latex_options = "striped")
+
+data_24mo_remove_NA <- data_24mo %>% drop_na(prop_att_00_06)
+
+
+# By Treatment
+data_24mo_remove_NA_prop_att_00_06 <- data_24mo %>% drop_na(prop_att_00_06)
+
+arm1_24mo <- filter(data_24mo_remove_NA_prop_att_00_06, treatment_arm=="In-clinic individual")
+arm2_24mo <- filter(data_24mo_remove_NA_prop_att_00_06, treatment_arm=="Phone group")
+arm3_24mo <- filter(data_24mo_remove_NA_prop_att_00_06, treatment_arm=="In-clinic group")
+
+arm1_summary <- t(summary(arm1_24mo$prop_att_00_06))
+arm2_summary <- t(summary(arm2_24mo$prop_att_00_06))
+arm3_summary <- t(summary(arm3_24mo$prop_att_00_06))
+
+prop_att_00_06_summary <- rbind(arm1_summary, arm2_summary, arm3_summary)
+rownames(prop_att_00_06_summary) = c("In-Clinic Individual", "Phone Group", "In-Clinic Group")
+
+kable(prop_att_00_06_summary, caption = "Summary Table of Attendance Proportion for Months 0-6") %>% 
+  kable_styling(latex_options = "striped")
+
+```
+
+
+```{r desc stats attendance 0-6 mo treatment, fig.height=3, fig.width=6}
+
+p1 <- ggplot(data_24mo_remove_NA, aes(x=factor(1), y=prop_att_00_06)) + 
+  geom_boxplot() +
+  labs(x="Overall", y="Attendance (Proportion)") +
+  geom_hline(yintercept=1, color = "red")
+
+
+p2 <- ggplot(data_24mo_remove_NA_prop_att_00_06, aes(x=treatment_arm, y=prop_att_00_06)) + 
+  geom_boxplot() +
+  labs(x="Treatment Arm", y="Attendance (Proportion)") +
+  geom_hline(yintercept=1, color = "red")
+
+grid.arrange(p1, p2, ncol=2, widths=c(4, 8), top=textGrob("Attendance (0-6 months)"))
+
+```
+
+\pagebreak
+
+## End of Study (7-24 Months)
+
+```{r desc stats attendance 7-24 mo}
+
+# Overall
+prop_attend_end <- t(summary(data_24mo$prop_att_07_24))
+kable(prop_attend_end, caption = "Summary Table of Attendance Proportion for Months 7-24") %>% 
+  kable_styling(latex_options = "striped")
+
+data_24mo_remove_NA <- data_24mo %>% drop_na(prop_att_07_24)
+
+
+# By Treatment
+data_24mo_remove_NA_prop_att_07_24 <- data_24mo %>% drop_na(prop_att_07_24)
+
+arm1_24mo <- filter(data_24mo_remove_NA_prop_att_07_24, treatment_arm=="In-clinic individual")
+arm2_24mo <- filter(data_24mo_remove_NA_prop_att_07_24, treatment_arm=="Phone group")
+arm3_24mo <- filter(data_24mo_remove_NA_prop_att_07_24, treatment_arm=="In-clinic group")
+
+arm1_summary <- t(summary(arm1_24mo$prop_att_07_24))
+arm2_summary <- t(summary(arm2_24mo$prop_att_07_24))
+arm3_summary <- t(summary(arm3_24mo$prop_att_07_24))
+
+prop_att_07_24_summary <- rbind(arm1_summary, arm2_summary, arm3_summary)
+rownames(prop_att_07_24_summary) = c("In-Clinic Individual", "Phone Group", "In-Clinic Group")
+
+kable(prop_att_07_24_summary, caption = "Summary Table of Attendance Proportion for Months 7-24") %>% 
+  kable_styling(latex_options = "striped")
+
+```
+
+
+```{r desc stats attendance 7-24 mo treatment, fig.height= 3, fig.width=6}
+
+p1 <- ggplot(data_24mo_remove_NA, aes(x=factor(1), y=prop_att_07_24)) + 
+  geom_boxplot() +
+  labs(x="Overall", y="Attendance (Proportion)") +
+  geom_hline(yintercept=1, color = "red")
+
+p2 <- ggplot(data_24mo_remove_NA_prop_att_07_24, aes(x=treatment_arm, y=prop_att_07_24)) + 
+  geom_boxplot() +
+  labs(x="Treatment Arm", y="Attendance (Proportion)") +
+  geom_hline(yintercept=1, color = "red")
+
+grid.arrange(p1, p2, ncol=2, widths=c(4, 8), top=textGrob("Attendance (7-24 months)"))
+
+```
+
+\pagebreak
+
+## Entire Study (0-24 Months)
+
+```{r desc stats attendance overall}
+
+# Overall
+prop_attend_overall <- t(summary(data_24mo$prop_attend_overall))
+kable(prop_attend_overall, caption = "Summary Table of Overall Attendance Proportion") %>% 
+  kable_styling(latex_options = "striped")
+
+data_24mo_remove_NA <- data_24mo %>% drop_na(prop_attend_overall)
+
+
+# By Treatment
+data_24mo_remove_NA_prop_attend_overall <- data_24mo %>% drop_na(prop_attend_overall)
+
+arm1_24mo <- filter(data_24mo_remove_NA_prop_attend_overall, treatment_arm=="In-clinic individual")
+arm2_24mo <- filter(data_24mo_remove_NA_prop_attend_overall, treatment_arm=="Phone group")
+arm3_24mo <- filter(data_24mo_remove_NA_prop_attend_overall, treatment_arm=="In-clinic group")
+
+arm1_summary <- t(summary(arm1_24mo$prop_attend_overall))
+arm2_summary <- t(summary(arm2_24mo$prop_attend_overall))
+arm3_summary <- t(summary(arm3_24mo$prop_attend_overall))
+
+prop_attend_overall_summary <- rbind(arm1_summary, arm2_summary, arm3_summary)
+rownames(prop_attend_overall_summary) = c("In-Clinic Individual", "Phone Group", "In-Clinic Group")
+
+kable(prop_attend_overall_summary, caption = "Summary Table of Attendance Proportion for Months 7-24") %>%
+  kable_styling(latex_options = "striped")
+
+```
+
+
+
+```{r desc stats attendance overall treatment, fig.height= 3, fig.width=6}
+
+p1 <- ggplot(data_24mo, aes(x=factor(1), y=prop_attend_overall)) + 
+  geom_boxplot() +
+  labs(x="Overall", y="Attendance (Proportion)") +
+  geom_hline(yintercept=1, color = "red")
+
+
+p2 <- ggplot(data_24mo_remove_NA_prop_attend_overall, aes(x=treatment_arm, y=prop_attend_overall)) + 
+  geom_boxplot() +
+  labs(x="Treatment Arm", y="Attendance (Proportion)") +
+  geom_hline(yintercept=1, color = "red")
+
+grid.arrange(p1, p2, ncol=2, widths=c(4, 8), top=textGrob("Attendance (Entire Study)"))
+
+```
+
+\pagebreak
+
+# IWQOL Score
+
+## IWQOL: Total
+
+### Beginning of Study (0 Months)
+
+```{r desc stats IWQOL treatment 0mo, fig.height= 3, fig.width=5}
+
+IWQOL_0mo <- t(summary(data_0mo$iwqoltotal))
+kable(IWQOL_0mo, caption = "Summary Table of Total IWQOL Score at 0 Months") %>% 
+  kable_styling(latex_options = "striped")
+
+
+data_0mo_remove_NA_iwqoltotal <- data_0mo %>% drop_na(iwqoltotal)
+
+arm1_0mo <- filter(data_0mo_remove_NA_iwqoltotal, treatment_arm=="In-clinic individual")
+arm2_0mo <- filter(data_0mo_remove_NA_iwqoltotal, treatment_arm=="Phone group")
+arm3_0mo <- filter(data_0mo_remove_NA_iwqoltotal, treatment_arm=="In-clinic group")
+
+arm1_summary <- t(summary(arm1_0mo$iwqoltotal))
+arm2_summary <- t(summary(arm2_0mo$iwqoltotal))
+arm3_summary <- t(summary(arm3_0mo$iwqoltotal))
+
+iwqoltotal_summary <- rbind(arm1_summary, arm2_summary, arm3_summary)
+rownames(iwqoltotal_summary) = c("In-Clinic Individual", "Phone Group", "In-Clinic Group")
+
+kable(iwqoltotal_summary, caption = "Summary Table of Total IWQOL Score at 6 Months") %>% 
+  kable_styling(latex_options = "striped")
+
+ggplot(data_0mo, aes(x=treatment_arm, y=iwqoltotal)) + 
+  geom_boxplot() +
+  labs(title="IWQOL Score at 0 Months", x="Treatment Arm", y="IWQOL Score") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+\pagebreak
+
+### Middle of Study (6 Months)
+
+```{r desc stats IWQOL treatment 6mo, fig.height= 3, fig.width=5}
+
+IWQOL_6mo <- t(summary(data_6mo$iwqoltotal))
+kable(IWQOL_6mo, caption = "Summary Table of Total IWQOL Score at 6 Months") %>% 
+  kable_styling(latex_options = "striped")
+
+
+data_6mo_remove_NA_iwqoltotal <- data_6mo %>% drop_na(iwqoltotal)
+
+arm1_6mo <- filter(data_6mo_remove_NA_iwqoltotal, treatment_arm=="In-clinic individual")
+arm2_6mo <- filter(data_6mo_remove_NA_iwqoltotal, treatment_arm=="Phone group")
+arm3_6mo <- filter(data_6mo_remove_NA_iwqoltotal, treatment_arm=="In-clinic group")
+
+arm1_summary <- t(summary(arm1_6mo$iwqoltotal))
+arm2_summary <- t(summary(arm2_6mo$iwqoltotal))
+arm3_summary <- t(summary(arm3_6mo$iwqoltotal))
+
+iwqoltotal_summary <- rbind(arm1_summary, arm2_summary, arm3_summary)
+rownames(iwqoltotal_summary) = c("In-Clinic Individual", "Phone Group", "In-Clinic Group")
+
+kable(iwqoltotal_summary, caption = "Summary Table of Total IWQOL Score at 6 Months") %>% 
+  kable_styling(latex_options = "striped")
+
+ggplot(data_6mo, aes(x=treatment_arm, y=iwqoltotal)) + 
+  geom_boxplot() +
+  labs(title="IWQOL Score at 6 Months", x="Treatment Arm", y="IWQOL Score") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+\pagebreak
+
+### End of Study (24 Months)
+
+```{r desc stats IWQOL treatment 24mo, fig.height= 3, fig.width=5}
+
+IWQOL_24mo <- t(summary(data_24mo$iwqoltotal))
+kable(IWQOL_6mo, caption = "Summary Table of Total IWQOL Score at 24 Months") %>% 
+  kable_styling(latex_options = "striped")
+
+data_24mo_remove_NA_iwqoltotal <- data_24mo %>% drop_na(iwqoltotal)
+
+arm1_24mo <- filter(data_24mo_remove_NA_iwqoltotal, treatment_arm=="In-clinic individual")
+arm2_24mo <- filter(data_24mo_remove_NA_iwqoltotal, treatment_arm=="Phone group")
+arm3_24mo <- filter(data_24mo_remove_NA_iwqoltotal, treatment_arm=="In-clinic group")
+
+arm1_summary <- t(summary(arm1_24mo$iwqoltotal))
+arm2_summary <- t(summary(arm2_24mo$iwqoltotal))
+arm3_summary <- t(summary(arm3_24mo$iwqoltotal))
+
+iwqoltotal_summary <- rbind(arm1_summary, arm2_summary, arm3_summary)
+rownames(iwqoltotal_summary) = c("In-Clinic Individual", "Phone Group", "In-Clinic Group")
+
+kable(iwqoltotal_summary, caption = "Summary Table of Total IWQOL Score at 24 Months") %>% 
+  kable_styling(latex_options = "striped")
+        
+ggplot(data_24mo, aes(x=treatment_arm, y=iwqoltotal)) + 
+  geom_boxplot() +
+  labs(title="IWQOL Score at 24 Months", x="Treatment Arm", y="IWQOL Score") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+\pagebreak
+
+## IWQOL: Physical Function
+
+### Beginning of Study (0 Months)
+
+```{r desc stats IWQOL physical treatment 0mo, fig.height= 3, fig.width=5}
+
+IWQOL_0mo <- t(summary(data_0mo$iwqol_physical))
+kable(IWQOL_0mo, caption = "Summary Table of Physical IWQOL Score at 0 Months") %>% 
+  kable_styling(latex_options = "striped")
+
+
+data_0mo_remove_NA_iwqol_physical <- data_0mo %>% drop_na(iwqol_physical)
+
+arm1_0mo <- filter(data_0mo_remove_NA_iwqol_physical, treatment_arm=="In-clinic individual")
+arm2_0mo <- filter(data_0mo_remove_NA_iwqol_physical, treatment_arm=="Phone group")
+arm3_0mo <- filter(data_0mo_remove_NA_iwqol_physical, treatment_arm=="In-clinic group")
+
+arm1_summary <- t(summary(arm1_0mo$iwqol_physical))
+arm2_summary <- t(summary(arm2_0mo$iwqol_physical))
+arm3_summary <- t(summary(arm3_0mo$iwqol_physical))
+
+iwqol_physical_summary <- rbind(arm1_summary, arm2_summary, arm3_summary)
+rownames(iwqol_physical_summary) = c("In-Clinic Individual", "Phone Group", "In-Clinic Group")
+
+kable(iwqol_physical_summary, caption = "Summary Table of Physical IWQOL Score at 0 Months") %>% 
+  kable_styling(latex_options = "striped")
+
+ggplot(data_0mo, aes(x=treatment_arm, y=iwqol_physical)) + 
+  geom_boxplot() +
+  labs(title="Physical IWQOL Score at 0 Months", x="Treatment Arm", y="Physical IWQOL Score") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+\pagebreak
+
+### Middle of Study (6 Months)
+
+```{r desc stats IWQOL Physical treatment 6mo, fig.height= 3, fig.width=5}
+
+IWQOL_6mo <- t(summary(data_6mo$iwqol_physical))
+kable(IWQOL_6mo, caption = "Summary Table of Physical IWQOL Score at 6 Months") %>% 
+  kable_styling(latex_options = "striped")
+
+data_6mo_remove_NA_iwqol_physical <- data_6mo %>% drop_na(iwqol_physical)
+
+arm1_6mo <- filter(data_6mo_remove_NA_iwqol_physical, treatment_arm=="In-clinic individual")
+arm2_6mo <- filter(data_6mo_remove_NA_iwqol_physical, treatment_arm=="Phone group")
+arm3_6mo <- filter(data_6mo_remove_NA_iwqol_physical, treatment_arm=="In-clinic group")
+
+arm1_summary <- t(summary(arm1_6mo$iwqol_physical))
+arm2_summary <- t(summary(arm2_6mo$iwqol_physical))
+arm3_summary <- t(summary(arm3_6mo$iwqol_physical))
+
+iwqol_physical_summary <- rbind(arm1_summary, arm2_summary, arm3_summary)
+rownames(iwqol_physical_summary) = c("In-Clinic Individual", "Phone Group", "In-Clinic Group")
+
+kable(iwqol_physical_summary, caption = "Summary Table of Physical IWQOL Score at 6 Months") %>% 
+  kable_styling(latex_options = "striped")
+
+ggplot(data_6mo, aes(x=treatment_arm, y=iwqol_physical)) + 
+  geom_boxplot() +
+  labs(title="Physical IWQOL Score at 6 Months", x="Treatment Arm", y="Physical IWQOL Score") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+\pagebreak
+
+### End of Study (24 Months)
+
+```{r desc stats IWQOL Physical treatment 24mo, fig.height= 3, fig.width=5}
+
+IWQOL_24mo <- t(summary(data_24mo$iwqol_physical))
+kable(IWQOL_6mo, caption = "Summary Table of Physical IWQOL Score at 24 Months") %>% 
+  kable_styling(latex_options = "striped")
+
+
+data_24mo_remove_NA_iwqol_physical <- data_24mo %>% drop_na(iwqol_physical)
+
+arm1_24mo <- filter(data_24mo_remove_NA_iwqol_physical, treatment_arm=="In-clinic individual")
+arm2_24mo <- filter(data_24mo_remove_NA_iwqol_physical, treatment_arm=="Phone group")
+arm3_24mo <- filter(data_24mo_remove_NA_iwqol_physical, treatment_arm=="In-clinic group")
+
+arm1_summary <- t(summary(arm1_24mo$iwqol_physical))
+arm2_summary <- t(summary(arm2_24mo$iwqol_physical))
+arm3_summary <- t(summary(arm3_24mo$iwqol_physical))
+
+iwqol_physical_summary <- rbind(arm1_summary, arm2_summary, arm3_summary)
+rownames(iwqol_physical_summary) = c("In-Clinic Individual", "Phone Group", "In-Clinic Group")
+
+kable(iwqol_physical_summary, caption = "Summary Table of Physical IWQOL Score at 24 Months") %>% 
+  kable_styling(latex_options = "striped")
+        
+ggplot(data_24mo, aes(x=treatment_arm, y=iwqol_physical)) + 
+  geom_boxplot() +
+  labs(title="Physical IWQOL Score at 24 Months", x="Treatment Arm", y="Physical IWQOL Score") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+\pagebreak
+
+## IWQOL: Self-Esteem
+
+### Beginning of Study (0 Months)
+
+```{r desc stats IWQOL esteem treatment 0mo, fig.height= 3, fig.width=5}
+
+IWQOL_0mo <- t(summary(data_0mo$iwqolself_esteem))
+kable(IWQOL_0mo, caption = "Summary Table of Self-Esteem IWQOL Score at 0 Months") %>% 
+  kable_styling(latex_options = "striped")
+
+
+data_0mo_remove_NA_iwqolself_esteem <- data_0mo %>% drop_na(iwqolself_esteem)
+
+arm1_0mo <- filter(data_0mo_remove_NA_iwqolself_esteem, treatment_arm=="In-clinic individual")
+arm2_0mo <- filter(data_0mo_remove_NA_iwqolself_esteem, treatment_arm=="Phone group")
+arm3_0mo <- filter(data_0mo_remove_NA_iwqolself_esteem, treatment_arm=="In-clinic group")
+
+arm1_summary <- t(summary(arm1_0mo$iwqolself_esteem))
+arm2_summary <- t(summary(arm2_0mo$iwqolself_esteem))
+arm3_summary <- t(summary(arm3_0mo$iwqolself_esteem))
+
+iwqolself_esteem_summary <- rbind(arm1_summary, arm2_summary, arm3_summary)
+rownames(iwqolself_esteem_summary) = c("In-Clinic Individual", "Phone Group", "In-Clinic Group")
+
+kable(iwqolself_esteem_summary, caption = "Summary Table of Self-Esteem IWQOL Score at 0 Months") %>% 
+  kable_styling(latex_options = "striped")
+
+ggplot(data_0mo, aes(x=treatment_arm, y=iwqolself_esteem)) + 
+  geom_boxplot() +
+  labs(title="Self-Esteem IWQOL Score at 0 Months", x="Treatment Arm", y="Self-Esteem IWQOL Score") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+\pagebreak
+
+### Middle of Study (6 Months)
+
+```{r desc stats IWQOL esteem treatment 6mo, fig.height= 3, fig.width=5}
+
+IWQOL_6mo <- t(summary(data_6mo$iwqolself_esteem))
+kable(IWQOL_6mo, caption = "Summary Table of Self-Esteem IWQOL Score at 6 Months") %>% 
+  kable_styling(latex_options = "striped")
+
+
+data_6mo_remove_NA_iwqolself_esteem <- data_6mo %>% drop_na(iwqolself_esteem)
+
+arm1_6mo <- filter(data_6mo_remove_NA_iwqolself_esteem, treatment_arm=="In-clinic individual")
+arm2_6mo <- filter(data_6mo_remove_NA_iwqolself_esteem, treatment_arm=="Phone group")
+arm3_6mo <- filter(data_6mo_remove_NA_iwqolself_esteem, treatment_arm=="In-clinic group")
+
+arm1_summary <- t(summary(arm1_6mo$iwqolself_esteem))
+arm2_summary <- t(summary(arm2_6mo$iwqolself_esteem))
+arm3_summary <- t(summary(arm3_6mo$iwqolself_esteem))
+
+iwqolself_esteem_summary <- rbind(arm1_summary, arm2_summary, arm3_summary)
+rownames(iwqolself_esteem_summary) = c("In-Clinic Individual", "Phone Group", "In-Clinic Group")
+
+kable(iwqolself_esteem_summary, caption = "Summary Table of Self-Esteem IWQOL Score at 6 Months") %>% 
+  kable_styling(latex_options = "striped")
+
+ggplot(data_6mo, aes(x=treatment_arm, y=iwqolself_esteem)) + 
+  geom_boxplot() +
+  labs(title="Self-Esteem IWQOL Score at 6 Months", x="Treatment Arm", y="Self-Esteem IWQOL Score") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+\pagebreak
+
+### End of Study (24 Months)
+
+```{r desc stats IWQOL esteem treatment 24mo, fig.height= 3, fig.width=5}
+
+IWQOL_24mo <- t(summary(data_24mo$iwqolself_esteem))
+kable(IWQOL_6mo, caption = "Summary Table of Self-Esteem IWQOL Score at 24 Months") %>% 
+  kable_styling(latex_options = "striped")
+
+
+data_24mo_remove_NA_iwqolself_esteem <- data_24mo %>% drop_na(iwqolself_esteem)
+
+arm1_24mo <- filter(data_24mo_remove_NA_iwqolself_esteem, treatment_arm=="In-clinic individual")
+arm2_24mo <- filter(data_24mo_remove_NA_iwqolself_esteem, treatment_arm=="Phone group")
+arm3_24mo <- filter(data_24mo_remove_NA_iwqolself_esteem, treatment_arm=="In-clinic group")
+
+arm1_summary <- t(summary(arm1_24mo$iwqolself_esteem))
+arm2_summary <- t(summary(arm2_24mo$iwqolself_esteem))
+arm3_summary <- t(summary(arm3_24mo$iwqolself_esteem))
+
+iwqolself_esteem_summary <- rbind(arm1_summary, arm2_summary, arm3_summary)
+rownames(iwqolself_esteem_summary) = c("In-Clinic Individual", "Phone Group", "In-Clinic Group")
+
+kable(iwqolself_esteem_summary, caption = "Summary Table of Self-Esteem IWQOL Score at 24 Months") %>% 
+  kable_styling(latex_options = "striped")
+        
+ggplot(data_24mo, aes(x=treatment_arm, y=iwqolself_esteem)) + 
+  geom_boxplot() +
+  labs(title="Self-Esteem IWQOL Score at 24 Months", x="Treatment Arm", y="Self-Esteem IWQOL Score") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+\pagebreak
+
+## IWQOL: Sexual Life
+
+### Beginning of Study (0 Months)
+
+```{r desc stats IWQOL sexual treatment 0mo, fig.height= 3, fig.width=5}
+
+IWQOL_0mo <- t(summary(data_0mo$iwqolsexual))
+kable(IWQOL_0mo, caption = "Summary Table of Sexual IWQOL Score at 0 Months") %>% 
+  kable_styling(latex_options = "striped")
+
+data_0mo_remove_NA_iwqolsexual <- data_0mo %>% drop_na(iwqolsexual)
+
+arm1_0mo <- filter(data_0mo_remove_NA_iwqolsexual, treatment_arm=="In-clinic individual")
+arm2_0mo <- filter(data_0mo_remove_NA_iwqolsexual, treatment_arm=="Phone group")
+arm3_0mo <- filter(data_0mo_remove_NA_iwqolsexual, treatment_arm=="In-clinic group")
+
+arm1_summary <- t(summary(arm1_0mo$iwqolsexual))
+arm2_summary <- t(summary(arm2_0mo$iwqolsexual))
+arm3_summary <- t(summary(arm3_0mo$iwqolsexual))
+
+iwqolsexual_summary <- rbind(arm1_summary, arm2_summary, arm3_summary)
+rownames(iwqolsexual_summary) = c("In-Clinic Individual", "Phone Group", "In-Clinic Group")
+
+kable(iwqolsexual_summary, caption = "Summary Table of Sexual IWQOL Score at 0 Months") %>% 
+  kable_styling(latex_options = "striped")
+
+ggplot(data_0mo, aes(x=treatment_arm, y=iwqolsexual)) + 
+  geom_boxplot() +
+  labs(title="Sexual IWQOL Score at 0 Months", x="Treatment Arm", y="Sexual IWQOL Score") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+\pagebreak
+
+### Middle of Study (6 Months)
+
+```{r desc stats IWQOL sexual treatment 6mo, fig.height= 3, fig.width=5}
+
+IWQOL_6mo <- t(summary(data_6mo$iwqolsexual))
+kable(IWQOL_6mo, caption = "Summary Table of Sexual IWQOL Score at 6 Months") %>% 
+  kable_styling(latex_options = "striped")
+
+data_6mo_remove_NA_iwqolsexual <- data_6mo %>% drop_na(iwqolsexual)
+
+arm1_6mo <- filter(data_6mo_remove_NA_iwqolsexual, treatment_arm=="In-clinic individual")
+arm2_6mo <- filter(data_6mo_remove_NA_iwqolsexual, treatment_arm=="Phone group")
+arm3_6mo <- filter(data_6mo_remove_NA_iwqolsexual, treatment_arm=="In-clinic group")
+
+arm1_summary <- t(summary(arm1_6mo$iwqolsexual))
+arm2_summary <- t(summary(arm2_6mo$iwqolsexual))
+arm3_summary <- t(summary(arm3_6mo$iwqolsexual))
+
+iwqolsexual_summary <- rbind(arm1_summary, arm2_summary, arm3_summary)
+rownames(iwqolsexual_summary) = c("In-Clinic Individual", "Phone Group", "In-Clinic Group")
+
+kable(iwqolsexual_summary, caption = "Summary Table of Sexual IWQOL Score at 6 Months") %>% 
+  kable_styling(latex_options = "striped")
+
+ggplot(data_6mo, aes(x=treatment_arm, y=iwqolsexual)) + 
+  geom_boxplot() +
+  labs(title="Sexual IWQOL Score at 6 Months", x="Treatment Arm", y="Sexual IWQOL Score") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+\pagebreak
+
+### End of Study (24 Months)
+
+```{r desc stats IWQOL sexual treatment 24mo, fig.height= 3, fig.width=5}
+
+IWQOL_24mo <- t(summary(data_24mo$iwqolsexual))
+kable(IWQOL_6mo, caption = "Summary Table of Sexual IWQOL Score at 24 Months") %>% 
+  kable_styling(latex_options = "striped")
+
+
+data_24mo_remove_NA_iwqolsexual <- data_24mo %>% drop_na(iwqolsexual)
+
+arm1_24mo <- filter(data_24mo_remove_NA_iwqolsexual, treatment_arm=="In-clinic individual")
+arm2_24mo <- filter(data_24mo_remove_NA_iwqolsexual, treatment_arm=="Phone group")
+arm3_24mo <- filter(data_24mo_remove_NA_iwqolsexual, treatment_arm=="In-clinic group")
+
+arm1_summary <- t(summary(arm1_24mo$iwqolsexual))
+arm2_summary <- t(summary(arm2_24mo$iwqolsexual))
+arm3_summary <- t(summary(arm3_24mo$iwqolsexual))
+
+iwqolsexual_summary <- rbind(arm1_summary, arm2_summary, arm3_summary)
+rownames(iwqolsexual_summary) = c("In-Clinic Individual", "Phone Group", "In-Clinic Group")
+
+kable(iwqolsexual_summary, caption = "Summary Table of Sexual IWQOL Score at 24 Months") %>% 
+  kable_styling(latex_options = "striped")
+        
+ggplot(data_24mo, aes(x=treatment_arm, y=iwqolsexual)) + 
+  geom_boxplot() +
+  labs(title="Sexual IWQOL Score at 24 Months", x="Treatment Arm", y="Sexual IWQOL Score") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+\pagebreak
+
+## IWQOL: Distress
+
+### Beginning of Study (0 Months)
+
+```{r desc stats IWQOL Distress treatment 0mo, fig.height= 3, fig.width=5}
+
+IWQOL_0mo <- t(summary(data_0mo$iwqoldistress))
+kable(IWQOL_0mo, caption = "Summary Table of Distress IWQOL Score at 0 Months") %>% 
+  kable_styling(latex_options = "striped")
+
+
+data_0mo_remove_NA_iwqoldistress <- data_0mo %>% drop_na(iwqoldistress)
+
+arm1_0mo <- filter(data_0mo_remove_NA_iwqoldistress, treatment_arm=="In-clinic individual")
+arm2_0mo <- filter(data_0mo_remove_NA_iwqoldistress, treatment_arm=="Phone group")
+arm3_0mo <- filter(data_0mo_remove_NA_iwqoldistress, treatment_arm=="In-clinic group")
+
+arm1_summary <- t(summary(arm1_0mo$iwqoldistress))
+arm2_summary <- t(summary(arm2_0mo$iwqoldistress))
+arm3_summary <- t(summary(arm3_0mo$iwqoldistress))
+
+iwqoldistress_summary <- rbind(arm1_summary, arm2_summary, arm3_summary)
+rownames(iwqoldistress_summary) = c("In-Clinic Individual", "Phone Group", "In-Clinic Group")
+
+kable(iwqoldistress_summary, caption = "Summary Table of Distress IWQOL Score at 0 Months") %>% 
+  kable_styling(latex_options = "striped")
+
+ggplot(data_0mo, aes(x=treatment_arm, y=iwqoldistress)) + 
+  geom_boxplot() +
+  labs(title="Distress IWQOL Score at 0 Months", x="Treatment Arm", y="Distress IWQOL Score") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+\pagebreak
+
+### Middle of Study (6 Months)
+
+```{r desc stats IWQOL Distress treatment 6mo, fig.height= 3, fig.width=5}
+
+IWQOL_6mo <- t(summary(data_6mo$iwqoldistress))
+kable(IWQOL_6mo, caption = "Summary Table of Distress IWQOL Score at 6 Months") %>% 
+  kable_styling(latex_options = "striped")
+
+
+data_6mo_remove_NA_iwqoldistress <- data_6mo %>% drop_na(iwqoldistress)
+
+arm1_6mo <- filter(data_6mo_remove_NA_iwqoldistress, treatment_arm=="In-clinic individual")
+arm2_6mo <- filter(data_6mo_remove_NA_iwqoldistress, treatment_arm=="Phone group")
+arm3_6mo <- filter(data_6mo_remove_NA_iwqoldistress, treatment_arm=="In-clinic group")
+
+arm1_summary <- t(summary(arm1_6mo$iwqoldistress))
+arm2_summary <- t(summary(arm2_6mo$iwqoldistress))
+arm3_summary <- t(summary(arm3_6mo$iwqoldistress))
+
+iwqoldistress_summary <- rbind(arm1_summary, arm2_summary, arm3_summary)
+rownames(iwqoldistress_summary) = c("In-Clinic Individual", "Phone Group", "In-Clinic Group")
+
+kable(iwqoldistress_summary, caption = "Summary Table of Distress IWQOL Score at 6 Months") %>% 
+  kable_styling(latex_options = "striped")
+
+ggplot(data_6mo, aes(x=treatment_arm, y=iwqoldistress)) + 
+  geom_boxplot() +
+  labs(title="Distress IWQOL Score at 6 Months", x="Treatment Arm", y="Distress IWQOL Score") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+\pagebreak
+
+### End of Study (24 Months)
+
+```{r desc stats IWQOL Distress treatment 24mo, fig.height= 3, fig.width=5}
+
+IWQOL_24mo <- t(summary(data_24mo$iwqoldistress))
+kable(IWQOL_6mo, caption = "Summary Table of Distress IWQOL Score at 24 Months") %>% 
+  kable_styling(latex_options = "striped")
+
+
+data_24mo_remove_NA_iwqoldistress <- data_24mo %>% drop_na(iwqoldistress)
+
+arm1_24mo <- filter(data_24mo_remove_NA_iwqoldistress, treatment_arm=="In-clinic individual")
+arm2_24mo <- filter(data_24mo_remove_NA_iwqoldistress, treatment_arm=="Phone group")
+arm3_24mo <- filter(data_24mo_remove_NA_iwqoldistress, treatment_arm=="In-clinic group")
+
+arm1_summary <- t(summary(arm1_24mo$iwqoldistress))
+arm2_summary <- t(summary(arm2_24mo$iwqoldistress))
+arm3_summary <- t(summary(arm3_24mo$iwqoldistress))
+
+iwqoldistress_summary <- rbind(arm1_summary, arm2_summary, arm3_summary)
+rownames(iwqoldistress_summary) = c("In-Clinic Individual", "Phone Group", "In-Clinic Group")
+
+kable(iwqoldistress_summary, caption = "Summary Table of Distress IWQOL Score at 24 Months") %>% 
+  kable_styling(latex_options = "striped")
+        
+ggplot(data_24mo, aes(x=treatment_arm, y=iwqoldistress)) + 
+  geom_boxplot() +
+  labs(title="Distress IWQOL Score at 24 Months", x="Treatment Arm", y="Distress IWQOL Score") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+\pagebreak
+
+## IWQOL: Work
+
+### Beginning of Study (0 Months)
+
+```{r desc stats IWQOL Work treatment 0mo, fig.height= 3, fig.width=5}
+
+IWQOL_0mo <- t(summary(data_0mo$iwqolwork))
+kable(IWQOL_0mo, caption = "Summary Table of Work IWQOL Score at 0 Months") %>% 
+  kable_styling(latex_options = "striped")
+
+
+data_0mo_remove_NA_iwqolwork <- data_0mo %>% drop_na(iwqolwork)
+
+arm1_0mo <- filter(data_0mo_remove_NA_iwqolwork, treatment_arm=="In-clinic individual")
+arm2_0mo <- filter(data_0mo_remove_NA_iwqolwork, treatment_arm=="Phone group")
+arm3_0mo <- filter(data_0mo_remove_NA_iwqolwork, treatment_arm=="In-clinic group")
+
+arm1_summary <- t(summary(arm1_0mo$iwqolwork))
+arm2_summary <- t(summary(arm2_0mo$iwqolwork))
+arm3_summary <- t(summary(arm3_0mo$iwqolwork))
+
+iwqolwork_summary <- rbind(arm1_summary, arm2_summary, arm3_summary)
+rownames(iwqolwork_summary) = c("In-Clinic Individual", "Phone Group", "In-Clinic Group")
+
+kable(iwqolwork_summary, caption = "Summary Table of Work IWQOL Score at 0 Months") %>% 
+  kable_styling(latex_options = "striped")
+
+ggplot(data_0mo, aes(x=treatment_arm, y=iwqolwork)) + 
+  geom_boxplot() +
+  labs(title="Work IWQOL Score at 0 Months", x="Treatment Arm", y="Work IWQOL Score") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+\pagebreak
+
+### Middle of Study (6 Months)
+
+```{r desc stats IWQOL Work treatment 6mo, fig.height= 3, fig.width=5}
+
+IWQOL_6mo <- t(summary(data_6mo$iwqolwork))
+kable(IWQOL_6mo, caption = "Summary Table of Work IWQOL Score at 6 Months") %>% 
+  kable_styling(latex_options = "striped")
+
+
+data_6mo_remove_NA_iwqolwork <- data_6mo %>% drop_na(iwqolwork)
+
+arm1_6mo <- filter(data_6mo_remove_NA_iwqolwork, treatment_arm=="In-clinic individual")
+arm2_6mo <- filter(data_6mo_remove_NA_iwqolwork, treatment_arm=="Phone group")
+arm3_6mo <- filter(data_6mo_remove_NA_iwqolwork, treatment_arm=="In-clinic group")
+
+arm1_summary <- t(summary(arm1_6mo$iwqolwork))
+arm2_summary <- t(summary(arm2_6mo$iwqolwork))
+arm3_summary <- t(summary(arm3_6mo$iwqolwork))
+
+iwqolwork_summary <- rbind(arm1_summary, arm2_summary, arm3_summary)
+rownames(iwqolwork_summary) = c("In-Clinic Individual", "Phone Group", "In-Clinic Group")
+
+kable(iwqolwork_summary, caption = "Summary Table of Work IWQOL Score at 6 Months") %>% 
+  kable_styling(latex_options = "striped")
+
+ggplot(data_6mo, aes(x=treatment_arm, y=iwqolwork)) + 
+  geom_boxplot() +
+  labs(title="Work IWQOL Score at 6 Months", x="Treatment Arm", y="Work IWQOL Score") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+\pagebreak
+
+### End of Study (24 Months)
+
+```{r desc stats IWQOL Work treatment 24mo, fig.height= 3, fig.width=5}
+
+IWQOL_24mo <- t(summary(data_24mo$iwqolwork))
+kable(IWQOL_6mo, caption = "Summary Table of Work IWQOL Score at 24 Months") %>% 
+  kable_styling(latex_options = "striped")
+
+
+data_24mo_remove_NA_iwqolwork <- data_24mo %>% drop_na(iwqolwork)
+
+arm1_24mo <- filter(data_24mo_remove_NA_iwqolwork, treatment_arm=="In-clinic individual")
+arm2_24mo <- filter(data_24mo_remove_NA_iwqolwork, treatment_arm=="Phone group")
+arm3_24mo <- filter(data_24mo_remove_NA_iwqolwork, treatment_arm=="In-clinic group")
+
+arm1_summary <- t(summary(arm1_24mo$iwqolwork))
+arm2_summary <- t(summary(arm2_24mo$iwqolwork))
+arm3_summary <- t(summary(arm3_24mo$iwqolwork))
+
+iwqolwork_summary <- rbind(arm1_summary, arm2_summary, arm3_summary)
+rownames(iwqolwork_summary) = c("In-Clinic Individual", "Phone Group", "In-Clinic Group")
+
+kable(iwqolwork_summary, caption = "Summary Table of Work IWQOL Score at 24 Months") %>% 
+  kable_styling(latex_options = "striped")
+        
+ggplot(data_24mo, aes(x=treatment_arm, y=iwqolwork)) + 
+  geom_boxplot() +
+  labs(title="Work IWQOL Score at 24 Months", x="Treatment Arm", y="Work IWQOL Score") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+\pagebreak
+
+# Associations
+
+## Correlation Matrix
+
+```{r correlation matrix, out.width="100%"}
+
+data.cor <- subset(data, select=c(iwqoltotal, iwqol_physical, iwqolself_esteem, iwqolsexual, iwqoldistress, iwqolwork, prop_attend_overall, prop_att_00_06, prop_att_07_24, weight_chng_per))
+ 
+ggcorr(data.cor, label = TRUE, size = 4, label_size = 4, legend.size = 10, 
+       hjust = 1, layout.exp = 2,
+       low = "red4", mid = "white", high = "cadetblue")
+
+```
+
+\pagebreak
+
+## General Association Plots
+
+```{r association plots, out.width="75%"}
+
+ggplot(data_24mo) +
+  aes(x = prop_attend_overall, y = iwqoltotal) +
+  geom_point() +
+  labs(title = "Overall Attendance vs IWQOL", x="Proportion Attendance", y="Total IQWOL Score") +
+  sm_statCorr(label_x = 0, label_y = 0)
+
+ggplot(data_24mo) +
+  aes(x = prop_attend_overall, y = weight_chng_per) +
+  geom_point() +
+  labs(title = "Overall Attendance vs % Weight Change", x="Proportion Attendance", y="Percent Weight Change") +
+  sm_statCorr(label_x = 0, label_y = -35)
+
+#ggplot(data) +
+#  aes(x = prop_att_00_06, y = prop_att_07_24) +
+#  geom_point() +
+#  labs(title = "Association Between Attendance at Beginning and End of Study") +
+#  sm_statCorr(label_x = 0, label_y = 1)
+
+```
+
+\pagebreak
+
+## Percent Weight Change vs IWQOL Subscores
+
+```{r weight vs IWQOL, out.width="75%"}
+
+p1 <- ggplot(data_24mo) +
+  aes(x = iwqoltotal, y = weight_chng_per) +
+  geom_point() +
+  labs(title = "Total IWQOL vs Percent Weight Change", x="Total IWQOL Score", y="Percent Weight Change") +
+  sm_statCorr(label_x = 0, label_y = -30)
+
+p2 <- ggplot(data_24mo) +
+  aes(x = iwqol_physical, y = weight_chng_per) +
+  geom_point() +
+  labs(title = "Physical IWQOL vs Percent Weight Change", x="Physical IWQOL Score", y="Percent Weight Change") +
+  sm_statCorr(label_x = 0, label_y = -30)
+
+p3 <- ggplot(data_24mo) +
+  aes(x = iwqolself_esteem, y = weight_chng_per) +
+  geom_point() +
+  labs(title = "Self-Esteem IWQOL vs Percent Weight Change", x="Self-Esteem IWQOL Score", y="Percent Weight Change") +
+  sm_statCorr(label_x = 0, label_y = -30)
+
+p4 <- ggplot(data_24mo) +
+  aes(x = iwqolsexual, y = weight_chng_per) +
+  geom_point() +
+  labs(title = "Sexual IWQOL vs Percent Weight Change", x="Sexual IWQOL Score", y="Percent Weight Change") +
+  sm_statCorr(label_x = 0, label_y = -30)
+
+p5 <- ggplot(data_24mo) +
+  aes(x = iwqoldistress, y = weight_chng_per) +
+  geom_point() +
+  labs(title = "Distress IWQOL vs Percent Weight Change", x="Distress IWQOL Score", y="Percent Weight Change") +
+  sm_statCorr(label_x = 0, label_y = -30)
+
+p6 <- ggplot(data_24mo) +
+  aes(x = iwqolwork, y = weight_chng_per) +
+  geom_point() +
+  labs(title = "Work IWQOL vs Percent Weight Change", x="Work IWQOL Score", y="Percent Weight Change") +
+  sm_statCorr(label_x = 0, label_y = -30)
+
+p1
+p2
+p3
+p4
+p5
+p6
+
+```
+

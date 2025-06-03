@@ -1,0 +1,758 @@
+---
+title: "Mixed Models for IWQOL"
+author: "Olivia Rippee"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning=FALSE, message=FALSE, options(digits=3))
+library(tidyverse)
+library(knitr)
+library(lme4)
+library(lmerTest)
+library(kableExtra)
+library(broom.mixed)
+library(broom)
+library(MASS)
+library(pROC)
+library(car)
+library(fBasics)
+```
+
+
+```{r, data}
+
+data <- read.csv("path/data_OR.csv", 
+                 na.strings="NA")
+
+data$treatment_arm <- relevel(factor(data$treatment_arm), ref="In-clinic individual")
+
+data_0mo <- filter(data, time==0)
+data_6mo <- filter(data, time==6)
+data_24mo <- filter(data, time==24)
+
+predictors <- c("sex", "age", "rurality", "bmi", "mental_health", 
+                "two_plus_comorbidities", "treatment_arm", 
+                "weight_chng_per", "SITE", "Affiliation")
+
+outcomes <- c("iwqoltotal", "iwqol_delta_0to6", "iwqol_delta_0to24")
+
+data_6mo_na_rm <- drop_na(data_6mo[, names(data) %in% c(predictors, outcomes)])
+data_24mo_na_rm <- drop_na(data_24mo[, names(data) %in% c(predictors, outcomes)])
+
+```
+
+
+# IWQOL at 0 Months
+
+## Univariate Models (IWQOL at 0 Months)
+
+```{r, 0mo univariate}
+
+# Affiliation fixed, site random
+
+# Only affiliation and site
+model.affil <- lmer(iwqoltotal ~  Affiliation  + (1 | SITE), data_0mo)
+anova.affil <- anova(model.affil, type = "III")
+p.affil <- anova.affil[1,6]
+
+
+# Treatment arm
+model.treat <- lmer(iwqoltotal ~  Affiliation + treatment_arm + (1 | SITE), data_0mo)
+anova.treat <- anova(model.treat, type = "III")
+p.treat <- anova.treat[2,6]
+#summary(model.treat)
+  # lower QoL in-clinic individual group at baseline
+
+
+# Age
+model.age <- lmer(iwqoltotal ~ Affiliation + age + (1 | SITE), data_0mo)
+anova.age <- anova(model.age, type = "III")
+p.age <- anova.age[2,6]
+
+
+# Sex
+model.sex <- lmer(iwqoltotal ~ Affiliation + sex + (1 | SITE), data_0mo)
+anova.sex <- anova(model.sex, type = "III")
+p.sex <- anova.sex[2,6]
+
+
+# Rurality
+model.rural <- lmer(iwqoltotal ~ Affiliation + rurality + (1 | SITE), data_0mo)
+anova.rural <- anova(model.rural, type = "III")
+p.rural <- anova.rural[2,6]
+
+# bmi (initial)
+model.bmi <- lmer(iwqoltotal ~ Affiliation + bmi + (1 | SITE), data_0mo)
+anova.bmi <- anova(model.bmi, type = "III")
+p.bmi <- anova.bmi[2,6]
+
+
+# Mental health disorders
+model.mental <- lmer(iwqoltotal ~ Affiliation + mental_health + (1 | SITE), data_0mo)
+anova.mental <- anova(model.mental, type = "III")
+p.mental <- anova.mental[2,6]
+
+# 2+ comorbidities
+model.comorbid <- lmer(iwqoltotal ~ Affiliation + two_plus_comorbidities + (1 | SITE), 
+                       data_0mo)
+anova.comorbid <- anova(model.comorbid, type = "III")
+p.comorbid <- anova.comorbid[2,6]
+
+```
+
+
+```{r, 0mo univariate table}
+
+p.table <- rbind(p.affil, p.treat, p.age, p.sex, p.rural, p.bmi, p.mental, p.comorbid)
+colnames(p.table) <- c("p-value")
+
+rownames(p.table) <- c("Affliation", "Treatment Arm", "Age", "Sex", "Rurality", "BMI", 
+                       "Mental Health Disorder(s)", "Comorbidities (2+)")
+
+kable(p.table, linesep = "", 
+      caption = "Univariate Table - IWQOL Total at 0 Months", 
+      col.names = c("Variable", "p-value")) %>%
+  kable_styling(latex_options = "striped")
+
+write.csv(p.table, 
+          "S:/Biostats/BIO-STAT/Brown_Lexie/BIOS898/Olivia/Output Tables/0mo_Univariate.csv")
+
+```
+
+## Multivariable Models (IWQOL at 0 Months)
+
+### Full Model
+
+```{r, 0mo full}
+
+# All variables
+#-----------------------
+model.0mo.full <- lmer(iwqoltotal ~ Affiliation + treatment_arm + age + sex + rurality + 
+                         bmi + mental_health + two_plus_comorbidities + (1 | SITE), 
+                       data_0mo)
+
+table.0mo.full <- anova(model.0mo.full)
+
+rownames(table.0mo.full) <- c("Affliation", "Treatment Arm", "Age", "Sex", "Rurality", 
+                              "BMI", "Mental Health Disorder(s)", "Comorbidities (2+)")
+
+kable(table.0mo.full, linesep = "", 
+      caption = "Full Model - IWQOL Total at 0 Months", 
+      col.names = c("Variable", "Sum Sq", "Mean Sq", "Num DF", 
+                    "Den DF", "F value", "Pr(>F)")) %>%
+  kable_styling(latex_options = "striped")
+
+write.csv(table.0mo.full, 
+          "S:/Biostats/BIO-STAT/Brown_Lexie/BIOS898/Olivia/Output Tables/0mo_FullModel.csv")
+
+```
+
+\pagebreak
+
+### Reduced Model Intermediates
+
+```{r, 0mo reduced intermediate}
+
+# Remove age
+#-----------------------
+model.0mo.reduced1 <- lmer(iwqoltotal ~ Affiliation + treatment_arm + sex + rurality + 
+                             bmi + mental_health + two_plus_comorbidities + (1 | SITE), 
+                           data_0mo)
+
+table.0mo.reduced1 <- anova(model.0mo.reduced1)
+
+rownames(table.0mo.reduced1) <- c("Affliation", "Treatment Arm", "Sex", "Rurality", 
+                                  "BMI", "Mental Health Disorder(s)", "Comorbidities (2+)")
+
+kable(table.0mo.reduced1, linesep = "", 
+      caption = "Reduced Model 1 - Remove Age - IWQOL Total at 0 Months", 
+      col.names = c("Variable", "Sum Sq", "Mean Sq", "Num DF", 
+                    "Den DF", "F value", "Pr(>F)")) %>%
+  kable_styling(latex_options = "striped")
+
+
+
+# Remove comorbidites
+#-----------------------
+model.0mo.reduced2 <- lmer(iwqoltotal ~  Affiliation + treatment_arm + sex + rurality +
+                             bmi + mental_health + (1 | SITE), data_0mo)
+
+table.0mo.reduced2 <- anova(model.0mo.reduced2)
+
+rownames(table.0mo.reduced2) <- c("Affiliation", "Treatment Arm", "Sex", "Rurality", 
+                                  "BMI", "Mental Health Disorder(s)")
+
+kable(table.0mo.reduced2, linesep = "", 
+      caption = "Reduced Model 2 - Remove Comorbidities - IWQOL Total at 0 Months", 
+      col.names = c("Variable", "Sum Sq", "Mean Sq", "Num DF", 
+                    "Den DF", "F value", "Pr(>F)")) %>%
+  kable_styling(latex_options = "striped")
+
+
+
+# Remove affiliation
+#-----------------------
+model.0mo.reduced3 <- lmer(iwqoltotal ~ treatment_arm + sex + rurality + bmi + 
+                             mental_health + (1 | SITE), data_0mo)
+
+table.0mo.reduced3 <- anova(model.0mo.reduced3)
+
+rownames(table.0mo.reduced3) <- c("Treatment Arm", "Sex", "Rurality", 
+                                  "BMI", "Mental Health Disorder(s)")
+
+kable(table.0mo.reduced3, linesep = "", 
+      caption = "Reduced Model 3 - Remove Affiliation - IWQOL Total at 0 Months", 
+      col.names = c("Variable", "Sum Sq", "Mean Sq", "Num DF", 
+                    "Den DF", "F value", "Pr(>F)")) %>%
+  kable_styling(latex_options = "striped")
+
+```
+
+\pagebreak
+
+### Final Model
+
+```{r, 0mo final}
+
+# Remove treatment arm
+#-----------------------
+model.0mo.reduced4 <- lmer(iwqoltotal ~ sex + rurality + bmi + mental_health + (1 | SITE), 
+                           data_0mo)
+
+table.0mo.reduced4 <- anova(model.0mo.reduced4)
+
+rownames(table.0mo.reduced4) <- c("Sex", "Rurality", "BMI", "Mental Health Disorder(s)")
+
+kable(table.0mo.reduced4, linesep = "", 
+      caption = "Final Reduced Model - IWQOL Total at 0 Months", 
+      col.names = c("Variable", "Sum Sq", "Mean Sq", "Num DF", 
+                    "Den DF", "F value", "Pr(>F)")) %>%
+  kable_styling(latex_options = "striped")
+
+write.csv(table.0mo.reduced4, 
+          "S:/Biostats/BIO-STAT/Brown_Lexie/BIOS898/Olivia/Output Tables/0mo_ReducedModel.csv")
+
+```
+
+### Variance Inflation
+
+```{r, 0mo final vif}
+
+vif.0mo <- data.frame(vif(model.0mo.reduced4))
+
+rownames(vif.0mo) <- c("Sex", "Rurality", "BMI", "Mental Health Disorder(s)")
+
+kable(vif.0mo, linesep = "", 
+      caption = "Variance Inflation Factors for the Final Model - IWQOL Total at 0 Months", 
+      col.names = c("Variable", "GVIF", "DF", "GVIF^(1/(2*DF))")) %>%
+  kable_styling(latex_options = "striped")
+
+write.csv(vif.0mo, 
+          "S:/Biostats/BIO-STAT/Brown_Lexie/BIOS898/Olivia/Output Tables/0mo_VIF.csv")
+
+```
+
+### Estimates
+
+```{r, 0mo final estimates}
+
+# Estimates and CIs
+# ---------------------
+beta_estimates_0mo <- data.frame(fixef(model.0mo.reduced4))
+colnames(beta_estimates_0mo) <- "Beta Estimate"
+
+CI_bounds_0mo <- data.frame(confint(model.0mo.reduced4))
+CI_bounds_0mo <- CI_bounds_0mo[-c(1:2), ]        # Remove ".sig01", ".sigma"
+CIs_0mo <- data.frame(apply(CI_bounds_0mo, 1, function(ci) 
+  paste0("[", round(ci[1], 2), ", ", round(ci[2], 2), "]")))
+colnames(CIs_0mo) <- "95 Percent Confidence Interval"
+
+final_model_results_0mo <- cbind(beta_estimates_0mo, CIs_0mo)
+
+rownames(final_model_results_0mo) <- c("Intercept", "Male", "Large Rural", "Small Rural", 
+                                       "BMI", "Mental Health Disorder(s)")
+
+kable(final_model_results_0mo, linesep = "", 
+      caption = "Estimates and 95 Percent Confidence Intervals - IWQOL Total at 0 Months") %>%
+  kable_styling(latex_options = "striped")
+
+write.csv(final_model_results_0mo, 
+          "S:/Biostats/BIO-STAT/Brown_Lexie/BIOS898/Olivia/Output Tables/0mo_Estimates.csv")
+
+```
+
+
+```{r 0mo desc)}
+
+#final_vars <- c("sex", "rurality", "bmi", "mental_health")
+
+sum_sex_mean <- aggregate(data_0mo$iwqoltotal, list(data_0mo$sex), FUN=mean)
+sum_sex_sd <- aggregate(data_0mo$iwqoltotal, list(data_0mo$sex), FUN=sd)
+sum_sex <- merge(sum_sex_mean, sum_sex_sd, by=c("Group.1"))
+
+sum_rurality_mean <- aggregate(data_0mo$iwqoltotal, 
+                               list(data_0mo$rurality), FUN=mean)
+sum_rurality_sd <- aggregate(data_0mo$iwqoltotal, 
+                             list(data_0mo$rurality), FUN=sd)
+sum_rurality <- merge(sum_rurality_mean, sum_rurality_sd, by=c("Group.1"))
+
+sum_mental_health_mean <- aggregate(data_0mo$iwqoltotal, 
+                                    list(data_0mo$mental_health), FUN=mean)
+sum_mental_health_sd <- aggregate(data_0mo$iwqoltotal, 
+                                  list(data_0mo$mental_health), FUN=sd)
+sum_mental_health <- merge(sum_mental_health_mean, sum_mental_health_sd, by=c("Group.1"))
+
+
+sum_table_0mo <- rbind(sum_sex, sum_rurality, sum_mental_health)
+colnames(sum_table_0mo) <- c("Variable", "Mean", "Std Deviation")
+sum_table_0mo$Variable[6:7] <- c("No Mental Health Disorder", "Mental Health Disorder(s)")
+sum_table_0mo <- sum_table_0mo[c(1:3, 5, 4, 6:7), ]
+
+
+kable(sum_table_0mo, linesep = "", row.names = FALSE, 
+      caption = "Variable Summary Table - IWQOL Total at 0 Months") %>%
+  kable_styling(latex_options = "striped")
+
+```
+
+\pagebreak
+
+
+# IWQOL Change 0-6 Months
+
+## Univariate Models (0 to 6 Months)
+
+```{r, 6mo univariate}
+
+# Only affiliation and site
+model.affil <- lmer(iwqol_delta_0to6 ~  Affiliation  + (1 | SITE), data_6mo)
+anova.affil <- anova(model.affil, type = "III")
+p.affil <- anova.affil[1,6]
+
+
+# Treatment arm
+model.treat <- lmer(iwqol_delta_0to6 ~  Affiliation + treatment_arm + (1 | SITE), 
+                    data_6mo)
+anova.treat <- anova(model.treat, type = "III")
+p.treat <- anova.treat[2,6]
+
+
+# Age
+model.age <- lmer(iwqol_delta_0to6 ~ Affiliation + age + (1 | SITE), data_6mo)
+anova.age <- anova(model.age, type = "III")
+p.age <- anova.age[2,6]
+
+
+# Sex
+model.sex <- lmer(iwqol_delta_0to6 ~ Affiliation + sex + (1 | SITE), data_6mo)
+anova.sex <- anova(model.sex, type = "III")
+p.sex <- anova.sex[2,6]
+
+
+# Rurality
+model.rural <- lmer(iwqol_delta_0to6 ~ Affiliation + rurality + (1 | SITE), 
+                    data_6mo)
+anova.rural <- anova(model.rural, type = "III")
+p.rural <- anova.rural[2,6]
+
+
+# bmi (initial)
+model.bmi <- lmer(iwqol_delta_0to6 ~ Affiliation + bmi + (1 | SITE), data_6mo)
+anova.bmi <- anova(model.bmi, type = "III")
+p.bmi <- anova.bmi[2,6]
+
+
+# Mental health disorders
+model.mental <- lmer(iwqol_delta_0to6 ~ Affiliation + mental_health + (1 | SITE), 
+                     data_6mo)
+anova.mental <- anova(model.mental, type = "III")
+p.mental <- anova.mental[2,6]
+
+
+# 2+ comorbidities
+model.comorbid <- lmer(iwqol_delta_0to6 ~ Affiliation + two_plus_comorbidities 
+                       + (1 | SITE), data_6mo)
+anova.comorbid <- anova(model.comorbid, type = "III")
+p.comorbid <- anova.comorbid[2,6]
+
+
+# Percent Weight Change
+model.weight <- lmer(iwqol_delta_0to6 ~  Affiliation + weight_chng_per 
+                     + (1 | SITE), data_6mo)
+anova.weight <- anova(model.weight, type = "III")
+p.weight <- anova.weight[2,6]
+
+```
+
+
+```{r, 6mo univariate table}
+
+p.table <- rbind(p.affil, p.treat, p.age, p.sex, p.rural, p.bmi, 
+                 p.mental, p.comorbid, p.weight)
+colnames(p.table) <- c("p-value")
+
+rownames(p.table) <- c("Affliation", "Treatment Arm", "Age", "Sex", "Rurality", "BMI", 
+                       "Mental Health Disorder(s)", "Comorbidities (2+)", 
+                       "Percent Weight Change")
+
+kable(p.table, linesep = "", caption = "Univariate Table - Change in IWQOL at 6 Months", 
+      col.names = c("Variable", "p-value")) %>%
+  kable_styling(latex_options = "striped")
+
+write.csv(p.table, 
+          "S:/Biostats/BIO-STAT/Brown_Lexie/BIOS898/Olivia/Output Tables/6mo_Univariate.csv")
+
+```
+
+## Multivariable Models (0 to 6 Months)
+
+### Full Model
+
+```{r, 6mo full}
+
+# All variables
+# -----------------------
+model.6mo.full <- lmer(iwqol_delta_0to6 ~ age + sex + mental_health + weight_chng_per 
+                       + (1 | SITE), data_6mo)
+
+table.6mo.full <- anova(model.6mo.full)
+
+rownames(table.6mo.full) <- c("Age", "Sex", "Mental Health Disorder(s)", 
+                              "Percent Weight Change")
+
+kable(table.6mo.full, linesep = "", 
+      caption = "Full Model - Change in IWQOL at 6 Months", 
+      col.names = c("Variable", "Sum Sq", "Mean Sq", "Num DF", 
+                    "Den DF", "F value", "Pr(>F)")) %>%
+  kable_styling(latex_options = "striped")
+
+write.csv(table.6mo.full, 
+          "S:/Biostats/BIO-STAT/Brown_Lexie/BIOS898/Olivia/Output Tables/6mo_FullModel.csv")
+
+```
+
+### Final Model
+
+```{r, 6mo final}
+
+# Remove comorbidities
+# -----------------------
+model.6mo.reduced1 <- lmer(iwqol_delta_0to6 ~ sex + mental_health + weight_chng_per 
+                           + (1 | SITE), data_6mo)
+
+table.6mo.reduced1 <- anova(model.6mo.reduced1)
+
+rownames(table.6mo.reduced1) <- c("Sex", "Mental Health Disorder(s)", "Percent Weight Change")
+
+kable(table.6mo.reduced1, linesep = "", 
+      caption = "Final Reduced Model - Change in IWQOL at 6 Months", 
+      col.names = c("Variable", "Sum Sq", "Mean Sq", "Num DF", 
+                    "Den DF", "F value", "Pr(>F)")) %>%
+  kable_styling(latex_options = "striped")
+
+write.csv(table.6mo.reduced1, 
+          "S:/Biostats/BIO-STAT/Brown_Lexie/BIOS898/Olivia/Output Tables/6mo_ReducedModel.csv")
+
+```
+
+\pagebreak
+
+### Variance Inflation
+
+```{r, 6mo final vif}
+
+vif.6mo <- data.frame(vif(model.6mo.reduced1))
+rownames(vif.6mo) <- c("Sex", "Mental Health Disorder(s)", "Percent Weight Change")
+colnames(vif.6mo) <- "VIF"
+
+kable(vif.6mo, linesep = "", 
+      caption = "Variance Inflation Factors for the Final Model - Change in IWQOL at 6 Months", 
+      col.names = c("Variable", "VIF")) %>%
+  kable_styling(latex_options = "striped")
+
+write.csv(vif.6mo, 
+          "S:/Biostats/BIO-STAT/Brown_Lexie/BIOS898/Olivia/Output Tables/6mo_VIF.csv")
+
+```
+
+### Estimates
+
+```{r, 6mo final estimates}
+
+# Estimates and CIs
+# ---------------------
+beta_estimates_6mo <- data.frame(fixef(model.6mo.reduced1))
+colnames(beta_estimates_6mo) <- "Beta Estimate"
+
+CI_bounds_6mo <- data.frame(confint(model.6mo.reduced1))
+CI_bounds_6mo <- CI_bounds_6mo[-c(1:2), ]        # Remove ".sig01", ".sigma"
+CIs_6mo <- data.frame(apply(CI_bounds_6mo, 1, function(ci) 
+  paste0("[", round(ci[1], 2), ", ", round(ci[2], 2), "]")))
+colnames(CIs_6mo) <- "95 Percent Confidence Interval"
+
+final_model_results_6mo <- cbind(beta_estimates_6mo, CIs_6mo)
+
+rownames(final_model_results_6mo) <- c("Intercept", "Male", "Mental Health Disorder(s)", 
+                                       "Percent Weight Change")
+
+kable(final_model_results_6mo, linesep = "", 
+      caption = "Estimates and 95 Percent Confidence Intervals - Change in IWQOL at 6 Months",
+      col.names = c("Variable", "Beta Estimate", "95 Percent Confidence Interval")) %>%
+  kable_styling(latex_options = "striped")
+
+write.csv(final_model_results_6mo, 
+          "S:/Biostats/BIO-STAT/Brown_Lexie/BIOS898/Olivia/Output Tables/6mo_Estimates.csv")
+
+```
+
+
+```{r 6mo desc}
+
+#final_vars <- c("sex", "mental_health", "weight_chng_per")
+
+sum_sex_mean <- aggregate(data_6mo_na_rm$iwqol_delta_0to6, 
+                          list(data_6mo_na_rm$sex), FUN=mean)
+sum_sex_sd <- aggregate(data_6mo_na_rm$iwqol_delta_0to6, 
+                        list(data_6mo_na_rm$sex), FUN=sd)
+sum_sex <- merge(sum_sex_mean, sum_sex_sd, by=c("Group.1"))
+
+
+sum_mental_health_mean <- aggregate(data_6mo_na_rm$iwqol_delta_0to6, 
+                                    list(data_6mo_na_rm$mental_health), FUN=mean)
+sum_mental_health_sd <- aggregate(data_6mo_na_rm$iwqol_delta_0to6, 
+                                 list(data_6mo_na_rm$mental_health), FUN=sd)
+sum_mental_health <- merge(sum_mental_health_mean, sum_mental_health_sd, by=c("Group.1"))
+
+
+sum_table_6mo <- rbind(sum_sex, sum_mental_health)
+colnames(sum_table_6mo) <- c("Variable", "Mean", "Std Deviation")
+sum_table_6mo$Variable[3:4] <- c("No Mental Health Disorder", "Mental Health Disorder(s)")
+
+kable(sum_table_6mo, linesep = "", row.names = FALSE, 
+      caption = "Variable Summary Table - Change in IWQOL at 6 Months") %>%
+  kable_styling(latex_options = "striped")
+
+```
+
+\pagebreak
+
+
+# IWQOL Change 0-24 Months
+
+## Univariate Models (0-24 Months)
+
+```{r, 24mo univariate}
+
+# Only affiliation and site
+model.affil <- lmer(iwqol_delta_0to24 ~  Affiliation  + (1 | SITE), data_24mo)
+anova.affil <- anova(model.affil, type = "III")
+p.affil <- anova.affil[1,6]
+
+
+# Treatment arm
+model.treat <- lmer(iwqol_delta_0to24 ~  Affiliation + treatment_arm 
+                    + (1 | SITE), data_24mo)
+anova.treat <- anova(model.treat, type = "III")
+p.treat <- anova.treat[2,6]
+#summary(model.treat)
+
+
+# Age
+model.age <- lmer(iwqol_delta_0to24 ~ Affiliation + age + (1 | SITE), data_24mo)
+anova.age <- anova(model.age, type = "III")
+p.age <- anova.age[2,6]
+
+
+# Sex
+model.sex <- lmer(iwqol_delta_0to24 ~ Affiliation + sex + (1 | SITE), data_24mo)
+anova.sex <- anova(model.sex, type = "III")
+p.sex <- anova.sex[2,6]
+
+
+# Rurality
+model.rural <- lmer(iwqol_delta_0to24 ~ Affiliation + rurality + (1 | SITE), data_24mo)
+anova.rural <- anova(model.rural, type = "III")
+p.rural <- anova.rural[2,6]
+
+
+# bmi (initial)
+model.bmi <- lmer(iwqol_delta_0to24 ~ Affiliation + bmi + (1 | SITE), data_24mo)
+anova.bmi <- anova(model.bmi, type = "III")
+p.bmi <- anova.bmi[2,6]
+
+
+# Mental health disorders
+model.mental <- lmer(iwqol_delta_0to24 ~ Affiliation + mental_health 
+                     + (1 | SITE), data_24mo)
+anova.mental <- anova(model.mental, type = "III")
+p.mental <- anova.mental[2,6]
+
+# 2+ comorbidities
+model.comorbid <- lmer(iwqol_delta_0to24 ~ Affiliation + two_plus_comorbidities 
+                       + (1 | SITE), data_24mo)
+anova.comorbid <- anova(model.comorbid, type = "III")
+p.comorbid <- anova.comorbid[2,6]
+
+
+# Percent Weight Change
+model.weight <- lmer(iwqol_delta_0to6 ~  Affiliation + weight_chng_per 
+                     + (1 | SITE), data_24mo)
+anova.weight <- anova(model.weight, type = "III")
+p.weight <- anova.weight[2,6]
+
+```
+
+
+```{r, 24mo univariate table}
+
+p.table <- rbind(p.affil, p.treat, p.age, p.sex, p.rural, 
+                 p.bmi, p.mental, p.comorbid, p.weight)
+colnames(p.table) <- c("p-value")
+
+rownames(p.table) <- c("Affliation", "Treatment Arm", "Age", "Sex", "Rurality", "BMI", 
+                       "Mental Health Disorder(s)", "Comorbidities (2+)", 
+                       "Percent Weight Change")
+
+kable(p.table, linesep = "", 
+      caption = "Univariate Table - Change in IWQOL at 24 Months", 
+      col.names = c("Variable", "p-value")) %>%
+  kable_styling(latex_options = "striped")
+
+write.csv(p.table, 
+          "S:/Biostats/BIO-STAT/Brown_Lexie/BIOS898/Olivia/Output Tables/24mo_Univariate.csv")
+
+```
+
+
+## Multivariable Models (0-24 Months)
+
+### Full Model
+
+```{r, 24mo full}
+
+# Full model
+# ---------------------
+model.24mo.full <- lmer(iwqol_delta_0to24 ~ age + sex + mental_health + weight_chng_per 
+                        + (1 | SITE), data_24mo)
+
+table.24mo.full <- anova(model.24mo.full)
+
+rownames(table.24mo.full) <- c("Age", "Sex", "Mental Health Disorder(s)", 
+                               "Percent Weight Change")
+
+kable(table.24mo.full, linesep = "", 
+      caption = "Full Model - Change in IWQOL at 24 Months", 
+      col.names = c("Variable", "Sum Sq", "Mean Sq", "Num DF", 
+                    "Den DF", "F value", "Pr(>F)")) %>%
+  kable_styling(latex_options = "striped")
+
+write.csv(table.24mo.full, 
+          "S:/Biostats/BIO-STAT/Brown_Lexie/BIOS898/Olivia/Output Tables/24mo_FullModel.csv")
+
+```
+
+### Final Model
+
+```{r, 24mo final}
+
+# Remove age
+# ---------------------
+model.24mo.reduced1 <- lmer(iwqol_delta_0to24 ~ sex + mental_health + weight_chng_per 
+                            + (1 | SITE), data_24mo)
+
+table.24mo.reduced1 <- anova(model.24mo.reduced1)
+
+rownames(table.24mo.reduced1) <- c("Sex", "Mental Health Disorder(s)", 
+                                   "Percent Weight Change")
+
+kable(table.24mo.reduced1, linesep = "", 
+      caption = "Final Reduced Model - Change in IWQOL at 24 Months", 
+      col.names = c("Variable", "Sum Sq", "Mean Sq", "Num DF", 
+                    "Den DF", "F value", "Pr(>F)")) %>%
+  kable_styling(latex_options = "striped")
+
+write.csv(table.24mo.reduced1, 
+          "S:/Biostats/BIO-STAT/Brown_Lexie/BIOS898/Olivia/Output Tables/24mo_ReducedModel.csv")
+
+```
+
+\pagebreak
+
+### Variance Inflation
+
+```{r, 24mo final vif}
+
+vif.24mo <- data.frame(vif(model.24mo.reduced1))
+
+rownames(vif.24mo) <- c("Sex", "Mental Health Disorder(s)", "Percent Weight Change")
+colnames(vif.24mo) <- "VIF"
+
+kable(vif.24mo, linesep = "", 
+      caption = "Variance Inflation Factors for the Final Model - Change in IWQOL at 24 Months", 
+      col.names = c("Variable", "VIF")) %>%
+  kable_styling(latex_options = "striped")
+
+write.csv(vif.24mo, 
+          "S:/Biostats/BIO-STAT/Brown_Lexie/BIOS898/Olivia/Output Tables/24mo_VIF.csv")
+
+```
+
+### Estimates
+
+```{r, 24mo final estimates}
+
+# Estimates and CIs
+# ---------------------
+beta_estimates_24mo <- data.frame(fixef(model.24mo.reduced1))
+colnames(beta_estimates_24mo) <- "Beta Estimate"
+
+CI_bounds_24mo <- data.frame(confint(model.24mo.reduced1))
+CI_bounds_24mo <- CI_bounds_24mo[-c(1:2), ]        # Remove ".sig01", ".sigma"
+CIs_24mo <- data.frame(apply(CI_bounds_24mo, 1, function(ci) 
+  paste0("[", round(ci[1], 2), ", ", round(ci[2], 2), "]")))
+colnames(CIs_24mo) <- "95 Percent Confidence Interval"
+
+final_model_results_24mo <- cbind(beta_estimates_24mo, CIs_24mo)
+
+rownames(final_model_results_24mo) <- c("Intercept", "Male", "Mental Health Disorder(s)", 
+                                        "Percent Weight Change")
+
+kable(final_model_results_24mo, linesep = "", 
+      caption = "Estimates and 95 Percent Confidence Intervals - Change in IWQOL at 24 Months", 
+      col.names = c("Variable", "Beta Estimate", "95 Percent Confidence Interval")) %>%
+  kable_styling(latex_options = "striped")
+
+write.csv(final_model_results_24mo, 
+          "S:/Biostats/BIO-STAT/Brown_Lexie/BIOS898/Olivia/Output Tables/24mo_Estimates.csv")
+
+```
+
+
+```{r 24mo desc}
+
+#final_vars <- c("sex","household_income", "mental_health", "weight_chng_per")
+
+sum_sex_mean <- aggregate(data_24mo_na_rm$iwqol_delta_0to24, 
+                          list(data_24mo_na_rm$sex), FUN=mean)
+sum_sex_sd <- aggregate(data_24mo_na_rm$iwqol_delta_0to24, 
+                        list(data_24mo_na_rm$sex), FUN=sd)
+sum_sex <- merge(sum_sex_mean, sum_sex_sd, by=c("Group.1"))
+
+sum_mental_health_mean <- aggregate(data_24mo_na_rm$iwqol_delta_0to6, 
+                                    list(data_24mo_na_rm$mental_health), FUN=mean)
+sum_mental_health_sd <- aggregate(data_24mo_na_rm$iwqol_delta_0to6, 
+                                 list(data_24mo_na_rm$mental_health), FUN=sd)
+sum_mental_health <- merge(sum_mental_health_mean, sum_mental_health_sd, by=c("Group.1"))
+
+sum_table_24mo <- rbind(sum_sex, sum_mental_health)
+colnames(sum_table_24mo) <- c("Variable", "Mean", "Std Deviation")
+sum_table_24mo$Variable[3:4] <- c("No Mental Health Disorder", "Mental Health Disorder(s)")
+
+kable(sum_table_24mo, linesep = "", row.names = FALSE, 
+      caption = "Variable Summary Table - Change in IWQOL at 24 Months") %>%
+  kable_styling(latex_options = "striped")
+
+```
+

@@ -1,0 +1,358 @@
+---
+title: "Predicting Quality of Life Improvement During Rural Obesity Trial"
+author: "Olivia Rippee, Dr. Lexie Brown, Dr. Christie Befort"
+
+output: 
+  pdf_document:
+      toc: true
+fontsize: 12pt
+header-includes:
+    - \usepackage{setspace}\doublespacing
+---
+
+```{r setup, include=FALSE}
+
+hook_chunk = knitr::knit_hooks$get('chunk')
+
+knitr::knit_hooks$set(chunk = function(x, options) {
+  regular_output = hook_chunk(x, options)
+  if (isTRUE(options$singlespacing)) 
+    sprintf("\\singlespacing\n %s \n\\doublespacing", regular_output)
+  else
+    regular_output
+})
+
+knitr::opts_chunk$set(echo = FALSE, warning=FALSE, message=FALSE, options(digits=3), singlespacing = TRUE)
+
+library(knitr)
+library(tidyverse)
+library(ggplot2)
+library(lme4)
+library(lmerTest)
+library(kableExtra)
+library(broom.mixed)
+library(broom)
+library(MASS)
+library(pROC)
+library(car)
+library(fBasics)
+```
+
+# Introduction
+
+Lack of access to medical facilities is one of many of the issues faced by rural populations in healthcare. Doctors' offices are often too far from rural patients' residences to maintain regular visits for effective treatment. As a consequence of this barrier, obesity has been shown to have higher prevalence in rural areas than urban areas. To address this issue in rural Kansas, The University of Kansas Medical Center conducted a cluster randomized clinical trial for rural obesity treatment, called the RE-POWER study $[1,2]$.
+
+There were three treatments in this study. The Fee-for-Service (FFS) model, characterized by in-clinic individual treatment, is the current standard of care and was considered as the control for this study $[3,4]$. The two treatments of interest, Patient Centered Medical Home (PCMH) and Disease Management (DM), are two strategies that were predicted to improve weight loss for rural patients $[4,5,6]$. PCMH is an in-clinic group treatment, while DM utilizes group therapy over the phone with a licensed professional.
+
+To simplify the logistics of administering treatment, randomization occurred at the clinic level rather than the patient level. Randomization was stratified based on clinic size across treatment arms to remove any potential confounding.
+
+The study consisted of two major phases. The initial 0-6 months focused on weight loss treatment, with regular meetings and intervention. This was followed by months 7-24 consisting of maintenance meetings to assess whether weight loss and quality of life were maintained post-intensive treatment.
+
+The goal of the primary analysis for the RE-POWER study was to determine what factors, including treatment, were most effective for weight loss $[1,2]$. Building from this, the research aim for our analysis was to determine which factors predict baseline quality of life and change in quality of life during weight loss treatment, as we know this is a factor in weight loss.
+
+# Methods
+
+## Variables
+
+The original dataset contains over 100 variables. For the purposes of this study, we utilized or created the following variables of interest.
+
+### Study Design Variables
+
+Site is the clinic at which patient care was housed, which was stratified across treatment arms by size. Sites were assigned a number from 1 to 80.
+
+Affiliation, the stratification variable, refers to the medical center overseeing the site. The three oversight locations were KUMC, UNMC, and Marshfield Clinic. The majority of sites (58.4\%) were overseen by KUMC, 28.3\% by Marshfield Clinic, and 13.4\% by UNMC. 
+
+Treatment arm indicates which of the three treatments (FFS, PCMH, and DM) a patient was assigned to. The values of this variable were in-person individual, in-person group, and phone group.
+
+
+### Demographic Predictors
+
+Age refers to the age (in years) of the patient at the beginning of the study. The minimum age of the cohort was 21 and the maximum age was 75.
+
+Sex was recorded for each patient. These data only contain patients of male or female sex. There were 1081 females (76.8%\) and 326 males (23.2\%) in the study.
+
+Rurality was categorized into three levels: large rural, small rural, and isolated rural. 659 (46.8\%) of the enrolled patients were classified as Isolated Rural, 250 (17.8\%) as Small Rural, and 498 (35.4\%) as Large Rural.
+
+
+### Health Predictors
+
+BMI (body mass index) was calculated for each patient at the beginning of the study according to the following formula: $(weight(kg)_0*2.20462/height^2)*703$.
+
+Percent weight change was calculated for each patient at each follow-up time point as follows: $100*((weight_t  - weight_0)/weight_0)$.
+
+Mental Health Disorder(s) was a variable we defined as the presence (1) or absence (0) of one or more recorded mental health disorders. The three variables from the dataset we used to create this proxy variable were depression, anxiety, and other mental health disorder.
+
+Comorbidities (2+) was another proxy variable defined by our group. Any patient with a history of 2 or comorbidities was designated as a 1, otherwise they were designated as a 0. The comorbidities considered were: high cholesterol, asthma, respiratory condition(s), ulcerative colitis or Crohn's, hip and/or knee replacement, gallbladder disease or gallstone, heart failure, angina, stroke, cludication or peripheral arterial disease, arthritis, hyperthyroidism, hypothyroidism, hypertension, diabetes, cancer, and problems with muscles, bones, or joints that cause pain preventing walking for at least 20 minutes.
+
+
+### Outcomes
+
+Our outcome of interest for this study was the Impact of Weight on Quality of Life-Lite (IWQOL-L) survey score. The survey consisted of 31 questions on scale of 1-5 (1=Always, 2=Usually, 3=Sometimes, 4=Rarely, 5=Never). There were 5 subcategories of the IWQOL survey: physical function, self-esteem, sexual life, public distress, and work. Raw scores for each category were summed and scaled by the number of questions for the given category. The total IWQOL score was then computed by summing the scores for each category, and had range from 0-100 in order of increasing quality of life. The IWQOL survey was given to patients at 0 months, 6 months, and 24 months.
+
+We also created the variables iwqol_delta_0to6 and iwqol_delta_0to24, representing the change in IWQOL total score from 0 to 6 months and 0 to 24 months respectively. Each variable was calculated by taking the difference of IWQOL total score at the final timepoint and the IWQOL total score at 0 months.
+
+The three outcomes that we considered were 1) IWQOL at baseline (0 months), 2) change in IWQOL after the intensive treatment period (6 months), and 3) change in IWQOL at the end of the study (24 months).
+
+
+<br>
+
+
+We aimed to determine whether baseline demographic factors (gender, age, rurality category) and health factors (percent weight loss, BMI, depression/mental health disorders, and having 2 or more comorbidities) differentially impacted the change in quality of life during this weight loss study.
+
+
+## Modeling
+
+To account for correlations between patients at the same site and clinic stratification across treatment arms, we used mixed modeling. Affiliation was treated as a fixed effect, while site was designated at a random effect.
+
+We first fit univariate linear regression models for IWQOL using the demographic and health predictors of interest. All variables with univariate p-value < 0.1 were considered for the multiple linear models. From the full models, we then utilized a manual backwards selection strategy, removing variables with least significance one-at-a-time until all variables remaining in the models had p-value < 0.05. Based on the final reduced models, variance inflation factors were assessed to ensure the absence of multicollinearity (VIF < 5), and then estimates for the beta coefficients and 95\% confidence intervals were calculated.
+
+
+# Results
+
+## 0 Months
+
+We first fit the univariate linear models for IWQOL total score at baseline with each of the predictors, treating affiliation as a fixed effect and site as a random effect.
+
+```{r 0mo univariate}
+
+univariate_0mo <- read.csv("path/Output Tables/0mo_Univariate.csv")
+
+kable(univariate_0mo, linesep = "", caption = "Univariate Table - 0 Months", 
+      col.names = c("Variable", "p-value")) %>%
+  kable_styling(latex_options = "striped")
+
+```
+
+All variables were found to be significantly associated with IWQOL total ($p<0.1$), so all were considered for the full multiple linear model.
+
+```{r 0mo full}
+
+full_0mo <- read.csv("path/Output Tables/0mo_FullModel.csv")
+
+kable(full_0mo, caption = "Full Model - 0 Months", linesep = "",
+      col.names = c("Variable", "Sum Sq", "Mean Sq", "Num DF", "Den DF", "F value", "Pr(>F)")) %>%
+  kable_styling(latex_options = "striped")
+
+```
+
+The full model was then trimmed down by removing the variable with largest p-value (if $p>0.05$) and fitting a new model to the remaining variables. This process was repeated until all variables remaining had $p<0.05$. The intermediate models are omitted for brevity. To summarize, the variables removed were age ($p=0.305$), comorbidities ($p=0.090$), affiliation ($p=0.118$), and treatment arm ($p=0.105$).
+
+The final model is given below.
+
+```{r 0mo reduced}
+
+reduced_0mo <- read.csv("path/Output Tables/0mo_ReducedModel.csv")
+
+kable(reduced_0mo, caption = "Final Model - 0 Months", linesep = "",
+      col.names = c("Variable", "Sum Sq", "Mean Sq", "Num DF", "Den DF", "F value", "Pr(>F)")) %>%
+  kable_styling(latex_options = "striped")
+
+```
+
+To ensure the absence of multicollinearity, we assessed the variance inflation factors for each of the variables. Rurality is a categorical variable with 3 levels, so generalized variance inflation factor (GVIF) was needed.
+
+```{r 0mo VIF}
+
+VIF_0mo <- read.csv("path/Output Tables/0mo_VIF.csv")
+
+kable(VIF_0mo, linesep = "", 
+      caption = "Variance Inflation Factors for the Final Model - 0 Months", 
+      col.names = c("Variable", "GVIF", "DF", "GVIF^(1/(2*DF))")) %>%
+  kable_styling(latex_options = "striped")
+
+```
+
+No variance inflation factors were greater than 5, so we concluded that multicollinearity is not present in our model.
+
+<br>
+
+We then calculated estimates and 95\% confidence intervals for the final model.
+
+\pagebreak
+
+```{r 0mo estimates}
+
+estimates_0mo <- read.csv("path/Output Tables/0mo_Estimates.csv")
+
+colnames(estimates_0mo) <- c("Variable", "Estimate", '95 Percent Confidence Interval')
+
+kable(estimates_0mo, linesep = "",
+      caption = 'Estimates and 95\\% Confidence Intervals - 0 Months') %>%
+  kable_styling(latex_options = "striped")
+
+```
+
+The average baseline IWQOL total score for males was about 7 points higher than for females. Similarly, the average IWQOL total score for patients with at least one mental health disorder was  about 9 points lower than for patients without a mental health disorder. For a one-unit increase in BMI, baseline IWQOL score decreased by about 1.5 points. Finally, relative to patients living in areas classified as isolated rural, those in large rural areas had baseline IWQOL score about 3 points higher. There was no difference in IWQOL score between isolated rural areas and small rural areas.
+
+## 6 Months
+
+For the 6 month timepoint, we shifted to assessing change in IWQOL total score from baseline. We again fit univariate linear models, now including percent weight change as a predictor. As before, we treated affiliation as a fixed effect and site as a random effect.
+
+\pagebreak
+
+```{r 6mo univariate}
+
+univariate_6mo <- read.csv("path/Output Tables/6mo_Univariate.csv")
+
+kable(univariate_6mo, linesep = "", caption = "Univariate Table - 6 Months", 
+      col.names = c("Variable", "p-value")) %>%
+  kable_styling(latex_options = "striped")
+
+```
+
+In this case, only age, sex, mental health disorder(s), and percent weight change were significantly associated with change in IWQOL total ($p<0.1$). Only these four variables were considered for the full model.
+
+```{r 6mo full}
+
+full_6mo <- read.csv("path/Output Tables/6mo_FullModel.csv")
+
+kable(full_6mo, linesep = "", caption = "Full Model - 6 Months", 
+      col.names = c("Variable", "Sum Sq", "Mean Sq", "Num DF", "Den DF", "F value", "Pr(>F)")) %>%
+  kable_styling(latex_options = "striped")
+
+```
+
+Age was removed from the model ($p=0.174$), resulting in the reduced model below.
+
+```{r 6mo reduced}
+
+reduced_6mo <- read.csv("path/Output Tables/6mo_ReducedModel.csv")
+
+kable(reduced_6mo, linesep = "", caption = "Final Model - 6 Months", 
+      col.names = c("Variable", "Sum Sq", "Mean Sq", "Num DF", "Den DF", "F value", "Pr(>F)")) %>%
+  kable_styling(latex_options = "striped")
+
+```
+
+Variance inflation factors were calculated for these three variables. None of the variables were categorical with 3 or more levels, so GVIF was not necessary.
+
+```{r 6mo VIF}
+
+VIF_6mo <- read.csv("path/Output Tables/6mo_VIF.csv")
+
+kable(VIF_6mo, linesep = "", caption = "Variance Inflation Factors for the Final Model - 6 Months", col.names = c("Variable", "VIF")) %>%
+  kable_styling(latex_options = "striped")
+
+```
+
+None of the variance inflation factors were concerning ($VIF<5$), so we concluded that our model was free of multicollinearity. We then generated estimates based on this model.
+
+```{r 6mo estimates}
+
+estimates_6mo <- read.csv("path/Output Tables/6mo_Estimates.csv")
+
+colnames(estimates_6mo) <- c("Variable", "Estimate", '95 Percent Confidence Interval')
+
+kable(estimates_6mo, linesep = "", 
+      caption = 'Estimates and 95\\% Confidence Intervals - 6 Months') %>%
+  kable_styling(latex_options = "striped")
+
+```
+
+The average change in IWQOL total score for males was ~2.9 points lower than for females. Meaning, the change in IWQOL for females was ~2.9 points higher than for males. Since the females had a lower initial IWQOL, we believe this makes sense, as females had more room to improve.
+
+Similarly, the average change in IWQOL total score for patients with at least one mental health disorder was ~2.4 points higher than for patients without a mental health disorder. We make a similar observation relative to the baseline: patients with mental health disorders had a lower baseline IWQOL, and thus more room to improve.
+
+For a one-unit decrease in percent weight change (indicating weight loss), change in IWQOL score increased by ~0.8 points. This indicates that weight loss improves quality of life, as expected.
+
+## 24 Months
+
+We again assessed the change in IWQOL total score from baseline, this time at 24 months. We fit univariate linear models with the same predictors as before. We again treated affiliation as a fixed effect and site as a random effect.
+
+```{r 24mo univariate}
+
+univariate_24mo <- read.csv("path/Output Tables/24mo_Univariate.csv")
+
+kable(univariate_24mo, linesep = "", caption = "Univariate Table - 24 Months", 
+      col.names = c("Variable", "p-value")) %>%
+  kable_styling(latex_options = "striped")
+
+```
+
+Similar to the 6 month timepoint, age, sex, mental health disorder(s), and percent weight change were significantly associated with change in IWQOL total ($p<0.1$). These four variables were considered for the full model, given below.
+
+```{r 24mo full}
+
+full_24mo <- read.csv("path/Output Tables/24mo_FullModel.csv")
+
+kable(full_24mo, linesep = "", caption = "Full Model - 24 Months", 
+      col.names = c("Variable", "Sum Sq", "Mean Sq", "Num DF", "Den DF", "F value", "Pr(>F)")) %>%
+  kable_styling(latex_options = "striped")
+
+```
+
+Again, age was removed from the model ($p=0.734$), leaving sex, mental health disorder(s), and percent weight change in the final model.
+
+```{r 24mo reduced}
+
+reduced_24mo <- read.csv("path/Output Tables/24mo_ReducedModel.csv")
+
+kable(reduced_24mo, linesep = "", caption = "Final Model - 24 Months", 
+      col.names = c("Variable", "Sum Sq", "Mean Sq", "Num DF", "Den DF", "F value", "Pr(>F)")) %>%
+  kable_styling(latex_options = "striped")
+
+```
+
+Variance inflation factors were assessed for these three variables in the 24 month final model.
+
+```{r 24mo VIF}
+
+VIF_24mo <- read.csv("path/Output Tables/24mo_VIF.csv")
+
+kable(VIF_24mo, linesep = "", caption = "Variance Inflation Factors for the Final Model - 24 Months", col.names = c("Variable", "VIF")) %>%
+  kable_styling(latex_options = "striped")
+
+```
+
+No concerning variance inflation was present, so we proceeded to generate estimates for the model.
+
+```{r 24mo estimates}
+
+estimates_24mo <- read.csv("path/Output Tables/24mo_Estimates.csv")
+
+colnames(estimates_24mo) <- c("Variable", "Estimate", '95 Percent Confidence Interval')
+
+kable(estimates_24mo, linesep = "", 
+      caption = 'Estimates and 95\\% Confidence Intervals - 24 Months') %>%
+  kable_styling(latex_options = "striped")
+
+```
+
+Resembling to our results at 6 months, the average change in IWQOL total score for males was ~2.8 points lower than for females. Meaning, the change in IWQOL for females was ~2.8 points higher than for males. The average change in IWQOL total score for patients with at least one mental health disorder was ~2.1 points higher than for patients without a mental health disorder. For a one-unit decrease in percent weight change, change in IWQOL score increased by ~0.7 points. As with the 6 month results, weight loss improved quality of life. Women and patients with mental health disorders had more room for improvement in quality of life and did in fact have a larger change over the course of the study.
+
+# Discussion and Conclusion
+
+Many social determinants of health and medical conditions were found to be associated with quality of life at the beginning of the study. Whenever considered together, however, a few key predictors emerge. Sex, rurality category, BMI, and mental health disorder status have differential impacts on initial quality of life.
+
+When considering how quality of life improves over the course of the weight loss study, fewer conditions and demographic variables have significant associations. For both the 6 month and 24 month timepoints, we again see sex, mental health disorder status, and the relevant weight-related variable (percent weight change) as key predictors for quality of life improvement.
+
+Utilizing these results, we are able to better understand and predict how effective weight loss clinical trials will be for obesity patients in rural Kansas. Women and patients with mental health disorders have more quality of life to gain from participating in these weight loss clinical trials.
+
+In future work, we plan to conduct analyses using the five IWQOL subcategories as outcomes to determine which areas improved the most during the course of the study. We also want to determine whether baseline quality of life affects percent weight change. To do this, we will fit logistic regression models to the clinically significant thresholds of 5% and 10% weight loss.
+
+
+# Reflection
+
+While working on this project, I experienced handling longitudinal data and mixed modeling for the first time. Dr Brown's experience with coding and mixed modeling is in SAS, but my expertise is in R. Through this experience, we got the chance to work together to understand and apply the lmer package to conduct mixed modeling in R.
+
+
+I also learned about different strategies for model selection. In this study we chose to employ a manual backward selection strategy, since automated stepwise selection methods have not worked very well in Dr. Brown's experience with mixed modeling. Best subsets could have been a good method to use, but neither Dr. Brown nor I were aware of a package in R that could perform best subsets analysis on mixed models. We  plan to conduct a confirmatory best subsets analysis in SAS.
+
+
+Finally (and arguably most importantly), this semester I learned that the term "multivariate" does not mean multiple predictors, but multiple outcomes. I had no idea that multivariate regression had a separate meaning from multiple regression, and since learning this have caught several mistaken uses of the terms. Although we did have the option to conduct multivariate analysis due to the longitudinal nature of the study, we chose to analyze the timepoints separately to get more specific information about the progression of quality of life.
+
+\pagebreak
+
+# References
+
+1. Befort CA, VanWormer JJ, Desouza C, et al. "Effect of Behavioral Therapy With In-Clinic or Telephone Group Visits vs In-Clinic Individual Visits on Weight Loss Among Patients With Obesity in Rural Clinical Practice: A Randomized Clinical Trial". *JAMA*. 2021;325(4):363–372. [doi:10.1001/jama.2020.25855](https://jamanetwork.com/journals/jama/fullarticle/2775448).
+
+2. Desouza, Cyrus V et al. "The effect of nonpharmaceutical weight-loss interventions in rural patients with diabetes: RE-POWER Diabetes". Obesity (Silver Spring, Md.) vol. 30,4 (2022): 884-892. [doi:10.1002/oby.23392](https://pubmed.ncbi.nlm.nih.gov/35275606/).
+
+3. Befort  CA, Klemp  JR, Sullivan  DK,  et al.  "Weight loss maintenance strategies among rural breast cancer survivors: the rural women connecting for better health trial".  *Obesity (Silver Spring)*. 2016;24(10):2070-2077. [doi:10.1002/oby.21625](https://pubmed.ncbi.nlm.nih.gov/27581328/).
+
+4. Paul-Ebhohimhen  V, Avenell  A.  "A systematic review of the effectiveness of group versus individual treatments for adult obesity".  *Obes Facts*. 2009;2(1):17-24. [doi:10.1159/000186144](https://pubmed.ncbi.nlm.nih.gov/20054200/).
+
+5. Donnelly  JE, Goetz  J, Gibson  C,  et al.  "Equivalent weight loss for weight management programs delivered by phone and clinic". *Obesity (Silver Spring)*. 2013;21(10):1951-1959. [doi:10.1002/oby.20334](https://pubmed.ncbi.nlm.nih.gov/23408579/).
+
+6. Jackson  GL, Powers  BJ, Chatterjee  R,  et al.  "The patient centered medical home: a systematic review". *Ann Intern Med*. 2013;158(3):169-178. [doi:10.7326/0003-4819-158-3-201302050-00579](https://pubmed.ncbi.nlm.nih.gov/24779044/).
